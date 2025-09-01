@@ -1,0 +1,127 @@
+import React from 'react'
+import { supabase } from './supabaseClient'
+
+type Mode = 'login' | 'signup' | 'magic'
+
+function AuthScreen() {
+  const [mode, setMode] = React.useState<Mode>('login')
+  const [email, setEmail] = React.useState('')
+  const [password, setPassword] = React.useState('')
+  const [loading, setLoading] = React.useState(false)
+  const [msg, setMsg] = React.useState<string|undefined>(undefined)
+
+  const run = async (fn: () => Promise<any>) => {
+    setLoading(true); setMsg(undefined)
+    try { await fn() } catch (e:any) { setMsg(e.message ?? String(e)) } finally { setLoading(false) }
+  }
+
+  const doLogin = () => run(async () => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) throw error
+    setMsg('ล็อกอินสำเร็จ ✅')
+  })
+  const doSignup = () => run(async () => {
+    const { error } = await supabase.auth.signUp({ email, password })
+    if (error) throw error
+    setMsg('สมัครสำเร็จ โปรดตรวจอีเมลเพื่อยืนยัน แล้วลองล็อกอิน')
+  })
+  const doMagic = () => run(async () => {
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.origin }
+    })
+    if (error) throw error
+    setMsg('ส่ง Magic Link แล้ว โปรดเช็คอีเมล ✉️')
+  })
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-blue-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-4xl grid md:grid-cols-2 gap-6">
+        {/* Left: Branding */}
+        <div className="hidden md:flex flex-col justify-center rounded-2xl border bg-white p-8 shadow-md">
+          <div className="flex items-center gap-4 mb-4">
+            <img src="/chg-logo.png" className="w-16 h-16 rounded-lg object-contain border" />
+            <div>
+              <div className="text-xl font-bold leading-tight">จุฬารัตน์ 3 อินเตอร์</div>
+              <div className="text-slate-600">Chularat 3 International Hospital</div>
+            </div>
+          </div>
+          <h1 className="text-2xl font-semibold mt-2">Medical Pool – Supabase</h1>
+          <p className="text-slate-600 mt-2">ระบบบริหารเครื่องมือแพทย์: ลงทะเบียน, ยืม-คืน, รายงาน, ตั้งค่า</p>
+          <ul className="mt-4 space-y-2 text-slate-700 text-sm list-disc list-inside">
+            <li>ลงชื่อเข้าใช้ด้วยอีเมล/รหัสผ่าน หรือ Magic Link</li>
+            <li>ข้อมูลเก็บใน Supabase แบบเรียลไทม์</li>
+            <li>Export รายงานเป็น .xlsx และพิมพ์เอกสาร</li>
+          </ul>
+        </div>
+
+        {/* Right: Auth Card */}
+        <div className="rounded-2xl border bg-white p-8 shadow-md">
+          <div className="flex items-center gap-3 mb-6">
+            <img src="/chg-logo.png" className="w-10 h-10 rounded-lg object-contain border" />
+            <div>
+              <div className="text-lg font-semibold">เข้าสู่ระบบ</div>
+              <div className="text-xs text-slate-500">Medical Pool – Supabase</div>
+            </div>
+          </div>
+
+          <div className="flex gap-2 mb-5">
+            <button onClick={()=>setMode('login')} className={`px-3 py-1.5 rounded-xl text-sm border ${mode==='login'?'bg-blue-600 text-white border-blue-600':'bg-white hover:bg-slate-50'}`}>ล็อกอิน</button>
+            <button onClick={()=>setMode('signup')} className={`px-3 py-1.5 rounded-xl text-sm border ${mode==='signup'?'bg-blue-600 text-white border-blue-600':'bg-white hover:bg-slate-50'}`}>สมัคร</button>
+            <button onClick={()=>setMode('magic')} className={`px-3 py-1.5 rounded-xl text-sm border ${mode==='magic'?'bg-blue-600 text-white border-blue-600':'bg-white hover:bg-slate-50'}`}>Magic Link</button>
+          </div>
+
+          <div className="space-y-3">
+            <label className="block">
+              <span className="block text-xs text-slate-600 mb-1">อีเมล</span>
+              <input value={email} onChange={e=>setEmail(e.target.value)} type="email" className="w-full px-3 py-2.5 border rounded-xl" placeholder="you@email.com" />
+            </label>
+            {mode!=='magic' && (
+              <label className="block">
+                <span className="block text-xs text-slate-600 mb-1">รหัสผ่าน</span>
+                <input value={password} onChange={e=>setPassword(e.target.value)} type="password" className="w-full px-3 py-2.5 border rounded-xl" placeholder="••••••••" />
+              </label>
+            )}
+          </div>
+
+          <div className="mt-5 flex gap-2">
+            {mode==='login' && <button onClick={doLogin} disabled={loading} className="px-4 py-2 rounded-xl bg-blue-600 text-white">{loading?'กำลังเข้าสู่ระบบ...':'เข้าสู่ระบบ'}</button>}
+            {mode==='signup' && <button onClick={doSignup} disabled={loading} className="px-4 py-2 rounded-xl bg-blue-600 text-white">{loading?'กำลังสมัคร...':'สมัครใช้งาน'}</button>}
+            {mode==='magic' && <button onClick={doMagic} disabled={loading} className="px-4 py-2 rounded-xl bg-blue-600 text-white">{loading?'กำลังส่งลิงก์...':'ส่ง Magic Link'}</button>}
+          </div>
+
+          {msg && <div className="mt-4 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-2">{msg}</div>}
+          {!msg && <div className="mt-4 text-xs text-slate-500"> * </div>}
+
+          <div className="mt-6 text-[11px] text-slate-400">
+            © CHG — Chularat 3 International Hospital
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+import InnerApp from './InnerApp'
+
+export default function App() {
+  const [ready, setReady] = React.useState(false)
+  const [isAuthed, setAuthed] = React.useState(false)
+
+  React.useEffect(() => {
+    let mounted = true
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return
+      setAuthed(!!data.session)
+      setReady(true)
+    })
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthed(!!session)
+    })
+    return () => { sub.subscription.unsubscribe(); mounted = false }
+  }, [])
+
+  if (!ready) return <div className="min-h-screen flex items-center justify-center text-slate-500">Loading...</div>
+  if (!isAuthed) return <AuthScreen />
+  return <InnerApp />
+}

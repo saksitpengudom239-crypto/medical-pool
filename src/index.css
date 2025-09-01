@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Extra utility used by the app */
+@layer utilities {
+  .shadow-soft {
+    @apply shadow-md;
+  }
+}
+
+/* Print styles for clean reports */
+@media print {
+  header, nav, .no-print { display: none !important; }
+  table { page-break-inside: auto; }
+  tr    { page-break-inside: avoid; page-break-after: auto; }
+}
