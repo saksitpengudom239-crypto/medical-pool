@@ -274,6 +274,27 @@ function SimpleLineChart({ data }: { data: MonthlyTrendPoint[] }) {
       <path d={makePath('borrow')} fill="none" stroke="#2563eb" strokeWidth="2" />
       <path d={makePath('return')} fill="none" stroke="#60a5fa" strokeWidth="2" />
 
+      {/* points + value labels */}
+      {data.map((d, i) => {
+        const x = padding + i * stepX;
+        const yBorrow = yScale(d.borrow);
+        const yReturn = yScale(d.return);
+        return (
+          <g key={i}>
+            {/* Borrow */}
+            <circle cx={x} cy={yBorrow} r={3} fill="#2563eb" />
+            <text x={x} y={yBorrow - 6} textAnchor="middle" fontSize="10" fill="#2563eb">
+              {d.borrow}
+            </text>
+            {/* Return */}
+            <circle cx={x} cy={yReturn} r={3} fill="#60a5fa" />
+            <text x={x} y={yReturn - 6} textAnchor="middle" fontSize="10" fill="#60a5fa">
+              {d.return}
+            </text>
+          </g>
+        );
+      })}
+
       {/* legend */}
       <g>
         <rect x={width - padding - 120} y={padding - 28} width="110" height="22" rx="6" fill="#F1F5F9" />
