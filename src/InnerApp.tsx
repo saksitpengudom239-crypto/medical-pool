@@ -407,7 +407,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
       <header className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
           <img src="/312501_logo_20220919143527.webp" alt="logo" className="w-9 h-9 rounded-xl object-contain border" />
-          <h1 className="text-lg font-semibold">Medical Pool – Supabase</h1>
+          <h1 className="text-lg font-semibold">Chularat – Medical Pool</h1>
           <nav className="ml-auto flex gap-1">
             {[
               {k:'dashboard', label:'แดชบอร์ด', icon: <LayoutDashboard className="w-4 h-4" />},
