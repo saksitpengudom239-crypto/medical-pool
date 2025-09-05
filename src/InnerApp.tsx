@@ -3,84 +3,6 @@ import { LayoutDashboard, Archive, Undo2, FileBarChart2, Settings as SettingsIco
 import * as XLSX from 'xlsx'
 import { supabase } from './supabaseClient'
 
-// Simple Error Boundary to avoid blank screen
-class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, err?: any}> {
-  constructor(props:any){ super(props); this.state = { hasError: false }; }
-  static getDerivedStateFromError(error:any){ return { hasError: true, err: error }; }
-  componentDidCatch(error:any, info:any){ console.error('UI ErrorBoundary:', error, info); }
-  render(){
-    if(this.state.hasError){
-      return <div className="p-4 m-4 border rounded-xl bg-rose-50 text-rose-700">
-        เกิดข้อผิดพลาดในการแสดงผล — โปรดลองรีเฟรชหน้า หรือส่งภาพหน้า Console มาให้ผู้ดูแล
-      </div>;
-    }
-    return this.props.children as any;
-  }
-}
-
-
-// Lightweight SVG line chart (no external deps)
-function BorrowLineChart({ data }: { data: { date: string; count: number }[] }) {
-  const width = 800, height = 240, pad = 32;
-  if (!data || data.length === 0) {
-    return <div className="text-sm text-slate-500">ไม่มีข้อมูลกราฟในช่วงที่เลือก</div>;
-  }
-  const parse = (d: string) => new Date(d + "T00:00:00").getTime();
-  const xs = data.map(d => parse(d.date));
-  const ys = data.map(d => d.count);
-  const minX = Math.min(...xs), maxX = Math.max(...xs);
-  const minY = 0, maxY = Math.max(1, Math.max(...ys));
-
-  const sx = (x: number) => pad + (maxX === minX ? 0 : (x - minX) / (maxX - minX) * (width - 2 * pad));
-  const sy = (y: number) => (height - pad) - (maxY === minY ? 0 : (y - minY) / (maxY - minY) * (height - 2 * pad));
-
-  const points = data.map(d => `${sx(parse(d.date)).toFixed(1)},${sy(d.count).toFixed(1)}`).join(" ");
-
-  // y ticks (0, max/2, max)
-  const yTicks = [0, Math.ceil(maxY/2), maxY];
-
-  // x ticks: first, middle, last
-  const xTicksIdx = [0, Math.floor(data.length/2), data.length-1].filter((v, i, arr) => arr.indexOf(v) === i);
-  const format = (d: string) => {
-    const [y,m,day] = d.split("-");
-    return `${day}/${m}`;
-  };
-
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-64">
-      {/* grid */}
-      {yTicks.map((t,i)=>(
-        <g key={i}>
-          <line x1={pad} y1={sy(t)} x2={width-pad} y2={sy(t)} stroke="#e5e7eb" strokeDasharray="3 3" />
-          <text x={4} y={sy(t)+4} fontSize="10" fill="#64748b">{t}</text>
-        </g>
-      ))}
-      {/* axes */}
-      <line x1={pad} y1={pad} x2={pad} y2={height-pad} stroke="#94a3b8" />
-      <line x1={pad} y1={height-pad} x2={width-pad} y2={height-pad} stroke="#94a3b8" />
-
-      {/* x ticks */}
-      {xTicksIdx.map((idx, i)=>{
-        const x = sx(xs[idx]);
-        return (
-          <g key={i}>
-            <line x1={x} y1={height-pad} x2={x} y2={height-pad+4} stroke="#94a3b8" />
-            <text x={x} y={height-pad+14} fontSize="10" textAnchor="middle" fill="#64748b">{format(data[idx].date)}</text>
-          </g>
-        );
-      })}
-
-      {/* line */}
-      <polyline fill="none" stroke="#2563eb" strokeWidth="2.5" points={points} />
-      {/* dots */}
-      {data.map((d,i)=>(
-        <circle key={i} cx={sx(xs[i])} cy={sy(ys[i])} r="2" fill="#2563eb" />
-      ))}
-    </svg>
-  );
-}
-
-
 const todayStr = (): string => new Date().toISOString().slice(0, 10)
 const parseDate = (d: string): Date => new Date(d + "T00:00:00")
 
@@ -288,8 +210,6 @@ function OptionEditor({ table, title }: { table: 'brands'|'vendors'|'departments
     </div>
   )
 }
-
-window.addEventListener("error", (e)=>{ console.error("GlobalError:", e.message, e.error); });
 
 export default function App() {
   const [tab, setTab] = React.useState<'dashboard'|'register'|'borrow'|'report'|'settings'>('dashboard')
@@ -525,60 +445,12 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
     XLSX.writeFile(wb, 'report.xlsx')
   }
 
-    const [dashBranch, setDashBranch] = React.useState<string>('All')
-  const [dashFrom, setDashFrom] = React.useState('')
-  const [dashTo, setDashTo] = React.useState('')
-
-const dashSeries = React.useMemo(() => {
-    // build daily counts by start_date after filters
-    const from = dashFrom ? new Date(dashFrom + 'T00:00:00').getTime() : -Infinity;
-    const to = dashTo ? new Date(dashTo + 'T00:00:00').getTime() : Infinity;
-    const counts: Record<string, number> = {};
-    borrows.forEach(b => {
-      const t = new Date(b.start_date + 'T00:00:00').getTime();
-      if (t < from || t > to) return;
-      // branch filter: match borrower_branch or asset.branch
-      const a = assets.find(x => x.id === b.asset_id);
-      const branchOk = dashBranch === 'All' || (b as any).borrower_branch === dashBranch || (a?.branch ?? '') === dashBranch;
-      if (!branchOk) return;
-      const d = b.start_date;
-      counts[d] = (counts[d] || 0) + 1;
-    });
-    // convert to sorted array
-    return Object.keys(counts).sort().map(d => ({ date: d, count: counts[d] }));
-  }, [borrows, assets, dashBranch, dashFrom, dashTo]);
-
-  const dashTotal = React.useMemo(() => dashSeries.reduce((sum,d)=>sum+d.count,0), [dashSeries]);
-  const dashAvg = React.useMemo(() => dashSeries.length? dashTotal/dashSeries.length:0, [dashSeries,dashTotal]);
-
-  const totalDash = React.useMemo(() => borrowTrendData.reduce((s, d) => (s as number) + (d as any).count, 0), [borrowTrendData]);
-const avgDash = React.useMemo(() => borrowTrendData.length ? totalDash / borrowTrendData.length : 0, [borrowTrendData, totalDash]);
-
-const overdue = React.useMemo(() => {
-
-  const borrowTrendData = React.useMemo(() => {
-    const from = dashFrom ? parseDate(dashFrom).getTime() : -Infinity;
-    const to   = dashTo   ? parseDate(dashTo).getTime()   : Infinity;
-    const grouped: Record<string, number> = {};
-    borrows.forEach(b => {
-      const t = parseDate(b.start_date).getTime();
-      if (t < from || t > to) return;
-      const asset = assets.find(a => a.id === b.asset_id);
-      if (dashBranch !== 'All') {
-        const branchOk = (b as any).borrower_branch === dashBranch || (asset?.branch ?? '') === dashBranch;
-        if (!branchOk) return;
-      }
-      const key = b.start_date;
-      grouped[key] = (grouped[key]||0)+1;
-    });
-    return Object.entries(grouped).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,count])=>({date,count})) || []; // fallback
-  }, [borrows, assets, dashBranch, dashFrom, dashTo]);
-const now = parseDate(todayStr()).getTime()
+  const overdue = React.useMemo(() => {
+    const now = parseDate(todayStr()).getTime()
     return borrows.filter(b => !b.returned && (now - parseDate(b.start_date).getTime())/(1000*60*60*24) > 14)
   }, [borrows])
 
   return (
-    <ErrorBoundary>
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 text-slate-800">
       <header className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b">
   <div className="mx-auto max-w-6xl px-3 sm:px-4 py-3 flex items-center gap-3">
@@ -657,20 +529,7 @@ const now = parseDate(todayStr()).getTime()
                     ))}
                   </tbody>
                 </table>
-              
-
-          <section className="md:col-span-3 bg-white border rounded-2xl p-4">
-            <h3 className="font-semibold mb-3">สถิติการยืม</h3>
-            <div className="grid md:grid-cols-3 gap-4 mb-4">
-              <Select label="สาขา" value={dashBranch} onChange={setDashBranch} options={['All', ...branchOpts]} />
-              <Text label="จากวันที่" type="date" value={dashFrom} onChange={setDashFrom} />
-              <Text label="ถึงวันที่" type="date" value={dashTo} onChange={setDashTo} />
-            </div>
-            <div style={{width:'100%', height:300}}>
-              {/* Inline SVG chart */}
-              <BorrowLineChart data={borrowTrendData as any} />
-            </div>
-          </section></div>
+              </div>
             </div>
           </section>
         )}
@@ -973,6 +832,5 @@ const now = parseDate(todayStr()).getTime()
       )}
 </main>
     </div>
-    </ErrorBoundary>
   )
 }
