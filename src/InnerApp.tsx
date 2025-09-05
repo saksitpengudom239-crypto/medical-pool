@@ -3,6 +3,11 @@ import { LayoutDashboard, Archive, Undo2, FileBarChart2, Settings as SettingsIco
 import * as XLSX from 'xlsx'
 import { supabase } from './supabaseClient'
 
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
+  CartesianGrid, Tooltip
+} from 'recharts'
+
 const todayStr = (): string => new Date().toISOString().slice(0, 10)
 const parseDate = (d: string): Date => new Date(d + "T00:00:00")
 
