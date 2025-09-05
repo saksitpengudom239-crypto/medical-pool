@@ -394,27 +394,26 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 text-slate-800">
       <header className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b">
-        <div className="mx-auto max-w-6xl px-3 sm:px-4 py-3">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
-          <img src="/312501_logo_20220919143527.webp" alt="logo" className="w-9 h-9 rounded-xl object-contain border" />
-          <h1 className="text-lg font-semibold">Medical Pool – Supabase</h1>
-          <nav className="ml-auto flex gap-1">
-            {[
-              {k:'dashboard', label:'แดชบอร์ด', icon: <LayoutDashboard className="w-4 h-4" />},
-              {k:'register', label:'ลงทะเบียน', icon: <Archive className="w-4 h-4" />},
-              {k:'borrow', label:'บันทึกยืม/คืน', icon: <Undo2 className="w-4 h-4" />},
-              {k:'report', label:'รายงาน', icon: <FileBarChart2 className="w-4 h-4" />},
-              {k:'settings', label:'ตั้งค่า', icon: <SettingsIcon className="w-4 h-4" />},
-            ].map((t:any) => (
-              <button key={t.k} onClick={() => setTab(t.k as any)}
-                className={`px-3 py-1.5 rounded-xl text-sm border ${tab===t.k?'bg-blue-600 text-white border-blue-600':'bg-white hover:bg-slate-50'}`}>
-                <span className="inline-flex items-center gap-1">{t.icon} {t.label}</span>
-              </button>
-            ))}
-          </nav>
-          <button onClick={async()=>{await supabase.auth.signOut(); location.reload();}} className="ml-2 px-3 py-1.5 rounded-xl text-sm border bg-white hover:bg-slate-50">ออกจากระบบ</button>
-        </div>
-      </header>
+  <div className="mx-auto max-w-6xl px-3 sm:px-4 py-3 flex items-center gap-3">
+    <img src="/312501_logo_20220919143527.webp" alt="logo" className="w-9 h-9 rounded-xl object-contain border" />
+    <h1 className="text-lg font-semibold">Chularat – Medical Pool</h1>
+    <nav className="ml-auto flex gap-1 overflow-x-auto no-scrollbar">
+      {[
+        {k:'dashboard', label:'แดชบอร์ด', icon: <LayoutDashboard className="w-4 h-4" />},
+        {k:'register', label:'ลงทะเบียน', icon: <Archive className="w-4 h-4" />},
+        {k:'borrow', label:'บันทึกยืม/คืน', icon: <Undo2 className="w-4 h-4" />},
+        {k:'report', label:'รายงาน', icon: <FileBarChart2 className="w-4 h-4" />},
+        {k:'settings', label:'ตั้งค่า', icon: <SettingsIcon className="w-4 h-4" />},
+      ].map((t:any) => (
+        <button key={t.k} onClick={() => setTab(t.k as any)}
+          className={`px-3 py-1.5 rounded-xl text-sm border ${tab===t.k?'bg-blue-600 text-white border-blue-600':'bg-white hover:bg-slate-50'}`}>
+          <span className="inline-flex items-center gap-1">{t.icon} {t.label}</span>
+        </button>
+      ))}
+    </nav>
+    <button onClick={async()=>{await supabase.auth.signOut(); location.reload();}} className="ml-2 px-3 py-1.5 rounded-xl text-sm border bg-white hover:bg-slate-50">ออกจากระบบ</button>
+  </div>
+</header>
 
       <main className="mx-auto max-w-6xl px-3 sm:px-4 py-6 space-y-6">
         {tab==='dashboard' && (
@@ -479,7 +478,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
         {tab==='register' && (
           <section className="bg-white border rounded-2xl p-4 shadow-soft space-y-4">
             <h2 className="text-lg font-semibold">หน้าลงทะเบียน</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+            <div className="grid md:grid-cols-2 gap-4">
               <Text label="เลขครุภัณฑ์ (Asset ID)" value={form.asset_id} onChange={v=>setForm(p=>({...p, asset_id:v}))} />
               <Text label="รหัสเครื่อง (ID CODE)" value={form.id_code} onChange={v=>setForm(p=>({...p, id_code:v}))} />
               <Text label="ชื่อเครื่องมือ" value={form.name} onChange={v=>setForm(p=>({...p, name:v}))} />
@@ -549,7 +548,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
         {tab==='borrow' && (
           <section className="bg-white border rounded-2xl p-4 shadow-soft space-y-4">
             <h2 className="text-lg font-semibold">บันทึกยืม/คืน</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+            <div className="grid md:grid-cols-2 gap-4">
               <label className="block">
                 <span className="block text-xs text-slate-600 mb-1">เลือกเครื่อง</span>
                 <select value={borrow.asset_id ?? ''} onChange={(e)=>{
@@ -747,7 +746,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-lg p-4 w-full max-w-2xl space-y-4">
             <h3 className="text-lg font-semibold">แก้ไขข้อมูลเครื่อง</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+            <div className="grid md:grid-cols-2 gap-4">
               <Text label="เลขครุภัณฑ์ (Asset ID)" value={editAsset.asset_id as any} onChange={v=>setEditAsset(p=>({...p, asset_id:v}))} />
               <Text label="รหัสเครื่อง (ID CODE)" value={editAsset.id_code as any} onChange={v=>setEditAsset(p=>({...p, id_code:v}))} />
               <Text label="ชื่อเครื่องมือ" value={editAsset.name as any} onChange={v=>setEditAsset(p=>({...p, name:v}))} />
@@ -773,3 +772,4 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
     </div>
   )
 }
+
