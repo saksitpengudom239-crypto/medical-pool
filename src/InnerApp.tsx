@@ -626,16 +626,15 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
                 <thead className="bg-slate-100 sticky top-0">
                   <tr>
                         <th className="px-3 py-2 text-left">วันที่ยืม</th>
-    			<th className="px-3 py-2 text-left">เลขครุภัณฑ์</th>
-    			<th className="px-3 py-2 text-left">รหัสเครื่อง</th>
-    			<th className="px-3 py-2 text-left">เครื่อง</th>
-    			<th className="px-3 py-2 text-left">ยี่ห้อ</th>
-    			<th className="px-3 py-2 text-left">รุ่น</th>
-    			<th className="px-3 py-2 text-left hidden md:table-cell">S/N</th>
-    			<th className="px-3 py-2 text-left">ผู้ยืม</th>
-    			<th className="px-3 py-2 text-left hidden sm:table-cell">แผนก</th>
-    			<th className="px-3 py-2 text-left hidden md:table-cell">มีลายเซ็น</th>
-    			<th className="px-3 py-2 text-left">คืน</th>
+                        <th className="px-3 py-2 text-left">ครุภัณฑ์/รหัส</th>
+                        <th className="px-3 py-2 text-left">เครื่อง</th>
+                        <th className="px-3 py-2 text-left hidden md:table-cell">ยี่ห้อ/รุ่น</th>
+                        <th className="px-3 py-2 text-left hidden md:table-cell">S/N</th>
+                        <th className="px-3 py-2 text-left">ผู้ยืม</th>
+                        <th className="px-3 py-2 text-left hidden sm:table-cell">แผนก</th>
+                        <th className="px-3 py-2 text-left hidden sm:table-cell">สาขา</th>
+                        <th className="px-3 py-2 text-left hidden md:table-cell">มีลายเซ็น</th>
+                        <th className="px-3 py-2 text-left">คืน</th>
                   </tr>
                 </thead>
 <tbody>
@@ -651,7 +650,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
         <td className="px-3 py-2">{b.borrower_name}</td>
         <td className="px-3 py-2 hidden sm:table-cell">{b.borrower_dept}</td>
         <td className="px-3 py-2 hidden sm:table-cell">{(b as any).borrower_branch ?? '-'}</td>
-        <td className="px-3 py-2">
+        <td className="px-3 py-2 hidden md:table-cell">
           {b.borrower_signature ? <span className="text-green-600">✔</span> : <span className="text-red-600">✘</span>}
         </td>
         <td className="px-3 py-2">
