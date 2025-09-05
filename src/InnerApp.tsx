@@ -708,14 +708,14 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
   {reportRows.map(r => (
     <tr key={r.id} className="border-b hover:bg-slate-50">
       <td className="px-3 py-2">{formatDate(r.start_date)}</td>
-      <td className="px-3 py-2">{r.asset_id ? r.asset_id : "-"}{r.id_code ? " / " + r.id_code : ""}</td></td>
+      <td className="px-3 py-2">{r.asset_id ? r.asset_id : "-"}{r.id_code ? " / " + r.id_code : ""}</td>
       <td className="px-3 py-2">{r.asset_name}</td>
       <td className="px-3 py-2 hidden md:table-cell">{[r.brand, r.model].filter(Boolean).join(" / ")}</td>
       <td className="px-3 py-2 hidden md:table-cell">{r.serial || "-"}</td>
       <td className="px-3 py-2">{r.borrower_name}</td>
       <td className="px-3 py-2 hidden sm:table-cell">{r.borrower_dept || "-"}</td>
       <td className="px-3 py-2 hidden sm:table-cell">{r.borrower_branch || "-"}</td>
-      <td className="px-3 py-2 hidden sm:table-cell">{r.asset_branch || "-"}</td></td>
+      <td className="px-3 py-2 hidden sm:table-cell">{r.asset_branch || "-"}</td>
       <td className="px-3 py-2 hidden md:table-cell">{r.has_signature === "✔" ? "✔" : "✘"}</td>
       <td className="px-3 py-2">{r.returned ? "✔" : "✘"}</td>
     </tr>
