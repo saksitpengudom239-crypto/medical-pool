@@ -406,6 +406,48 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
     const now = parseDate(todayStr()).getTime()
     return borrows.filter(b => !b.returned && (now - parseDate(b.start_date).getTime())/(1000*60*60*24) > 14)
   }, [borrows])
+  // === Dashboard analytics (Top departments & drill-down) ===
+  const [selectedDept, setSelectedDept] = React.useState<string | null>(null)
+
+  type DeptCount = { dept: string; count: number }
+
+  // Top 5 แผนกที่ยืมเยอะสุด
+  const topDeptData: DeptCount[] = React.useMemo(() => {
+    const m = new Map<string, number>()
+    for (const b of borrows) {
+      const k = b.borrower_dept || 'ไม่ระบุ'
+      m.set(k, (m.get(k) || 0) + 1)
+    }
+    return Array.from(m.entries())
+      .map(([dept, count]) => ({ dept, count }))
+      .sort((a,b) => b.count - a.count)
+      .slice(0, 5)
+  }, [borrows])
+
+  type ItemCount = { key: string; name: string; brand: string; model: string; count: number }
+  const topItemsForSelectedDept: ItemCount[] = React.useMemo(() => {
+    if (!selectedDept) return []
+    const joined = borrows
+      .filter(b => (b.borrower_dept || 'ไม่ระบุ') === selectedDept)
+      .map(b => {
+        const a = assets.find(x => x.id === b.asset_id)
+        return {
+          key: a ? `${a?.name ?? ''}|||${a?.brand ?? ''}|||${a?.model ?? ''}` : `ไม่พบข้อมูล||| ||| `,
+          name: a?.name || 'ไม่พบข้อมูล',
+          brand: a?.brand || '',
+          model: a?.model || ''
+        }
+      })
+    const m = new Map<string, ItemCount>()
+    for (const it of joined) {
+      const k = it.key
+      const cur = m.get(k)
+      if (!cur) m.set(k, { ...it, count: 1 })
+      else cur.count += 1
+    }
+    return Array.from(m.values()).sort((a,b) => b.count - a.count).slice(0, 10)
+  }, [selectedDept, borrows, assets])
+
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 text-slate-800">
@@ -724,7 +766,34 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
           </section>
         )}
       
-      {/* Edit Borrow Modal */}
+      {
+      {/* Modal: รายละเอียดเครื่องของแผนกที่เลือก */}
+      {selectedDept && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-3">
+          <div className="bg-white rounded-2xl shadow-lg w-full max-w-2xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-lg font-semibold">{selectedDept} ยืมบ่อยสุด</h3>
+              <button onClick={() => setSelectedDept(null)} className="px-3 py-1.5 rounded-lg border">ปิด</button>
+            </div>
+            <div className="space-y-2">
+              {topItemsForSelectedDept.length === 0 && (
+                <div className="text-sm text-slate-500">ไม่พบข้อมูล</div>
+              )}
+              {topItemsForSelectedDept.map((it) => (
+                <div key={it.key} className="flex items-center justify-between p-2 border rounded-xl">
+                  <div className="text-sm">
+                    <div className="font-medium">{it.name}</div>
+                    <div className="text-xs text-slate-500">รุ่น {it.model || '-'} · ยี่ห้อ {it.brand || '-'}</div>
+                  </div>
+                  <div className="text-sm font-semibold">× {it.count}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+/* Edit Borrow Modal */}
       {editingBorrowId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-lg p-4 w-full max-w-xl space-y-3">
