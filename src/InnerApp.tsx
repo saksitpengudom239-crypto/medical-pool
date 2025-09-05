@@ -215,6 +215,26 @@ export default function App() {
   const [assets, setAssets] = React.useState<Asset[]>([])
   const [borrows, setBorrows] = React.useState<Borrow[]>([])
 
+// === Dashboard chart state ===
+const [chartDept, setChartDept] = React.useState<string|null>(null);
+
+// Top 5 departments by active borrows (returned === false)
+const top5BorrowDepts = React.useMemo(() => {
+  const counts: Record<string, number> = {};
+  for (const b of borrows) {
+    if (!b.returned) {
+      const name = (b.borrower_dept || 'ไม่ระบุ').trim();
+      counts[name] = (counts[name] || 0) + 1;
+    }
+  }
+  const entries = Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+
+  const max = entries.length ? Math.max(...entries.map(([, n]) => n)) : 0;
+  return { entries, max };
+}, [borrows]);
+
 // รายชื่อ asset_id ที่ยังไม่คืน (กันยืมซ้ำ)
 const activeBorrowAssetIds = React.useMemo(() => {
   const ids = new Set<string>();
@@ -458,6 +478,47 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
               <div className="text-2xl font-semibold text-red-600">{overdue.length}</div>
             </div>
 
+
+            {/* === Chart: Top 5 แผนกที่ยืมเยอะสุด === */}
+            <div className="md:col-span-3 bg-white border rounded-2xl p-4 shadow-soft">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold">Top 5 แผนกที่ยืมเยอะสุด</h3>
+                <div className="text-xs text-slate-500">
+                  คลิกแท่งเพื่อดูรายละเอียด
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {top5BorrowDepts.entries.length === 0 ? (
+                  <div className="text-sm text-slate-500">ยังไม่มีรายการยืมที่ยังไม่คืน</div>
+                ) : (
+                  top5BorrowDepts.entries.map(([dept, count]) => {
+                    const widthPct = top5BorrowDepts.max ? Math.round((count / top5BorrowDepts.max) * 100) : 0;
+                    return (
+                      <button
+                        key={dept}
+                        onClick={() => setChartDept(dept)}
+                        className="w-full text-left group"
+                        title={`คลิกเพื่อดูรายละเอียดของแผนก: ${dept}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-36 shrink-0 text-sm text-slate-700 truncate">{dept}</div>
+                          <div className="relative flex-1 h-8 rounded-lg bg-slate-100 overflow-hidden">
+                            <div
+                              className="absolute inset-y-0 left-0 rounded-lg bg-emerald-500/80 group-hover:bg-emerald-600 transition-all"
+                              style={{ width: `${widthPct}%` }}
+                            />
+                            <div className="absolute inset-0 px-2 flex items-center justify-end text-xs font-medium text-slate-700">
+                              {count} รายการ
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
             <div className="md:col-span-3 bg-white border rounded-2xl p-4">
               <h3 className="font-semibold mb-3 flex items-center gap-2"><AlertTriangle className="text-red-600" /> รายการเกิน 14 วัน</h3>
               <div className="overflow-x-auto">
@@ -791,6 +852,69 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
             <div className="flex justify-end gap-2 pt-2">
               <button onClick={cancelEditAsset} className="px-3 py-1.5 rounded-lg border">ยกเลิก</button>
               <button onClick={saveEditAsset} className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white">บันทึก</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* === Modal: รายการยืมของแผนกที่คลิกจากกราฟ === */}
+      {chartDept && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-3">
+          <div className="bg-white rounded-2xl shadow-lg w-full max-w-3xl">
+            <div className="p-4 border-b flex items-center justify-between">
+              <h4 className="font-semibold">
+                รายละเอียดการยืม (ยังไม่คืน) — แผนก: <span className="text-emerald-700">{chartDept}</span>
+              </h4>
+              <button onClick={() => setChartDept(null)} className="px-3 py-1.5 rounded-lg border">
+                ปิด
+              </button>
+            </div>
+            <div className="p-4 overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50 text-slate-600">
+                    <th className="text-left px-3 py-2">ผู้ยืม</th>
+                    <th className="text-left px-3 py-2">S/N</th>
+                    <th className="text-left px-3 py-2">ชื่อเครื่อง</th>
+                    <th className="text-left px-3 py-2">วันที่ยืม</th>
+                    <th className="text-left px-3 py-2">กำหนดคืน</th>
+                    <th className="text-left px-3 py-2">สถานะ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {borrows
+                    .filter(b => !b.returned && (b.borrower_dept || 'ไม่ระบุ').trim() === chartDept)
+                    .map((b) => {
+                      const a = assets.find(x => x.id === b.asset_id);
+                      return (
+                        <tr key={b.id} className="border-b last:border-0">
+                          <td className="px-3 py-2">{b.borrower_name || '-'}</td>
+                          <td className="px-3 py-2">{a?.serial || '-'}</td>
+                          <td className="px-3 py-2">{a?.name || '-'}</td>
+                          <td className="px-3 py-2">{b.start_date || '-'}</td>
+                          <td className="px-3 py-2">{b.end_date || '-'}</td>
+                          <td className="px-3 py-2">
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-100 text-rose-700 text-xs">
+                              ✘ ติดยืม
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+            <div className="p-4 border-t flex items-center justify-end gap-2">
+              <button
+                onClick={() => {
+                  // ตัวอย่าง: redirect ไปหน้าอื่น (เช่น report/borrow) แล้วค่อยเพิ่มฟิลเตอร์ภายหลังได้
+                  // setTab('report')
+                  setChartDept(null);
+                }}
+                className="px-3 py-1.5 rounded-lg bg-slate-700 text-white"
+              >
+                ไปหน้าอื่น
+              </button>
             </div>
           </div>
         </div>
