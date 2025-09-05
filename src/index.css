@@ -15,3 +15,8 @@
   table { page-break-inside: auto; }
   tr    { page-break-inside: avoid; page-break-after: auto; }
 }
+
+/* Hide scrollbar for horizontal scrollable elements */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
