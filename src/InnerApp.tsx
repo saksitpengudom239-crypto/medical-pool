@@ -407,8 +407,10 @@ const activeBorrowAssetIds = React.useMemo(() => {
                       <tr key={b.id} className="border-b hover:bg-slate-50">
                         <td className="px-3 py-2">
       {b.returned ? (
-        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700 text-xs">✔ คืนแล้ว</span>
-        <button onClick={() => startEditBorrow(b)} className="ml-2 px-2 py-1 rounded bg-slate-600 text-white text-xs">แก้ไข</button>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700 text-xs">✔ คืนแล้ว</span>
+          <button onClick={() => startEditBorrow(b)} className="ml-2 px-2 py-1 rounded bg-slate-600 text-white text-xs">แก้ไข</button>
+        </div>
       ) : (
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-100 text-rose-700 text-xs">✘ ยังไม่คืน</span>
