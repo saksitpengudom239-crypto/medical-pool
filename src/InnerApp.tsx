@@ -3,11 +3,6 @@ import { LayoutDashboard, Archive, Undo2, FileBarChart2, Settings as SettingsIco
 import * as XLSX from 'xlsx'
 import { supabase } from './supabaseClient'
 
-import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
-  CartesianGrid, Tooltip
-} from 'recharts'
-
 const todayStr = (): string => new Date().toISOString().slice(0, 10)
 const parseDate = (d: string): Date => new Date(d + "T00:00:00")
 
@@ -64,17 +59,6 @@ const Select = ({ label, value, onChange, options, disabled }: {
     </select>
   </label>
 )
-
-
-// Local inline Edit icon to avoid import issues
-const EditIcon = ({ className = "w-3 h-3" }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-       stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-       className={className}>
-    <path d="M12 20h9" />
-    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-  </svg>
-);
 
 function SignaturePad({ value, onChange }: { value?: string; onChange: (dataUrl: string) => void }) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null)
@@ -406,74 +390,32 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
     const now = parseDate(todayStr()).getTime()
     return borrows.filter(b => !b.returned && (now - parseDate(b.start_date).getTime())/(1000*60*60*24) > 14)
   }, [borrows])
-  // === Dashboard analytics (Top departments & drill-down) ===
-  const [selectedDept, setSelectedDept] = React.useState<string | null>(null)
-
-  type DeptCount = { dept: string; count: number }
-
-  // Top 5 แผนกที่ยืมเยอะสุด
-  const topDeptData: DeptCount[] = React.useMemo(() => {
-    const m = new Map<string, number>()
-    for (const b of borrows) {
-      const k = b.borrower_dept || 'ไม่ระบุ'
-      m.set(k, (m.get(k) || 0) + 1)
-    }
-    return Array.from(m.entries())
-      .map(([dept, count]) => ({ dept, count }))
-      .sort((a,b) => b.count - a.count)
-      .slice(0, 5)
-  }, [borrows])
-
-  type ItemCount = { key: string; name: string; brand: string; model: string; count: number }
-  const topItemsForSelectedDept: ItemCount[] = React.useMemo(() => {
-    if (!selectedDept) return []
-    const joined = borrows
-      .filter(b => (b.borrower_dept || 'ไม่ระบุ') === selectedDept)
-      .map(b => {
-        const a = assets.find(x => x.id === b.asset_id)
-        return {
-          key: a ? `${a?.name ?? ''}|||${a?.brand ?? ''}|||${a?.model ?? ''}` : `ไม่พบข้อมูล||| ||| `,
-          name: a?.name || 'ไม่พบข้อมูล',
-          brand: a?.brand || '',
-          model: a?.model || ''
-        }
-      })
-    const m = new Map<string, ItemCount>()
-    for (const it of joined) {
-      const k = it.key
-      const cur = m.get(k)
-      if (!cur) m.set(k, { ...it, count: 1 })
-      else cur.count += 1
-    }
-    return Array.from(m.values()).sort((a,b) => b.count - a.count).slice(0, 10)
-  }, [selectedDept, borrows, assets])
-
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 text-slate-800">
       <header className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b">
-  <div className="mx-auto max-w-6xl px-3 sm:px-4 py-3 flex items-center gap-3">
-    <img src="/312501_logo_20220919143527.webp" alt="logo" className="w-9 h-9 rounded-xl object-contain border" />
-    <h1 className="text-lg font-semibold">Chularat – Medical Pool</h1>
-    <nav className="ml-auto flex gap-1 overflow-x-auto no-scrollbar">
-      {[
-        {k:'dashboard', label:'แดชบอร์ด', icon: <LayoutDashboard className="w-4 h-4" />},
-        {k:'register', label:'ลงทะเบียน', icon: <Archive className="w-4 h-4" />},
-        {k:'borrow', label:'บันทึกยืม/คืน', icon: <Undo2 className="w-4 h-4" />},
-        {k:'report', label:'รายงาน', icon: <FileBarChart2 className="w-4 h-4" />},
-        {k:'settings', label:'ตั้งค่า', icon: <SettingsIcon className="w-4 h-4" />},
-      ].map((t:any) => (
-        <button key={t.k} onClick={() => setTab(t.k as any)}
-          className={`px-3 py-1.5 rounded-xl text-sm border ${tab===t.k?'bg-blue-600 text-white border-blue-600':'bg-white hover:bg-slate-50'}`}>
-          <span className="inline-flex items-center gap-1">{t.icon} {t.label}</span>
-        </button>
-      ))}
-    </nav>
-    <button onClick={async()=>{await supabase.auth.signOut(); location.reload();}} className="ml-2 px-3 py-1.5 rounded-xl text-sm border bg-white hover:bg-slate-50">ออกจากระบบ</button>
-  </div>
-</header>
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
+          <img src="/312501_logo_20220919143527.webp" alt="logo" className="w-9 h-9 rounded-xl object-contain border" />
+          <h1 className="text-lg font-semibold">Medical Pool – Supabase</h1>
+          <nav className="ml-auto flex gap-1">
+            {[
+              {k:'dashboard', label:'แดชบอร์ด', icon: <LayoutDashboard className="w-4 h-4" />},
+              {k:'register', label:'ลงทะเบียน', icon: <Archive className="w-4 h-4" />},
+              {k:'borrow', label:'บันทึกยืม/คืน', icon: <Undo2 className="w-4 h-4" />},
+              {k:'report', label:'รายงาน', icon: <FileBarChart2 className="w-4 h-4" />},
+              {k:'settings', label:'ตั้งค่า', icon: <SettingsIcon className="w-4 h-4" />},
+            ].map((t:any) => (
+              <button key={t.k} onClick={() => setTab(t.k as any)}
+                className={`px-3 py-1.5 rounded-xl text-sm border ${tab===t.k?'bg-blue-600 text-white border-blue-600':'bg-white hover:bg-slate-50'}`}>
+                <span className="inline-flex items-center gap-1">{t.icon} {t.label}</span>
+              </button>
+            ))}
+          </nav>
+          <button onClick={async()=>{await supabase.auth.signOut(); location.reload();}} className="ml-2 px-3 py-1.5 rounded-xl text-sm border bg-white hover:bg-slate-50">ออกจากระบบ</button>
+        </div>
+      </header>
 
-      <main className="mx-auto max-w-6xl px-3 sm:px-4 py-6 space-y-6">
+      <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
         {tab==='dashboard' && (
           <section className="grid md:grid-cols-3 gap-4">
             <div className="bg-white border rounded-2xl p-4 shadow-soft">
@@ -491,7 +433,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
 
             <div className="md:col-span-3 bg-white border rounded-2xl p-4">
               <h3 className="font-semibold mb-3 flex items-center gap-2"><AlertTriangle className="text-red-600" /> รายการเกิน 14 วัน</h3>
-              <div className="overflow-x-auto">
+              <div className="overflow-auto">
                 <table className="min-w-full text-sm">
                   <thead className="bg-slate-100 sticky top-0">
                     <tr>
@@ -557,7 +499,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
               <button onClick={() => setForm({})} className="px-4 py-2 rounded-xl bg-slate-200">ล้างฟอร์ม</button>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-auto">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-100 sticky top-0">
                   <tr>
@@ -588,7 +530,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
                       <td className="px-3 py-2">
   <div className="flex items-center gap-2">
     <button onClick={() => startEditAsset(a)} className="px-2 py-1 rounded-lg bg-amber-500 text-white text-xs inline-flex items-center gap-1">
-      <EditIcon className="w-3 h-3" /> แก้ไข
+      <Pencil className="w-3 h-3" /> แก้ไข
     </button>
     <button onClick={() => delAsset(a.id)} className="px-2 py-1 rounded-lg bg-rose-600 text-white text-xs inline-flex items-center gap-1">
       <Trash2 className="w-3 h-3" /> ลบ
@@ -641,7 +583,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
               <button onClick={addBorrow} className="px-4 py-2 rounded-xl bg-blue-600 text-white" disabled={!borrow.asset_id || activeBorrowAssetIds.has(borrow.asset_id as string)}>บันทึกยืม</button>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-auto">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-100 sticky top-0">
                   <tr>
@@ -712,7 +654,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
               <button onClick={() => window.print()} className="px-4 py-2 rounded-xl bg-slate-200 inline-flex items-center gap-2"><Printer className="w-4 h-4"/> พิมพ์</button>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-auto">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-100 sticky top-0">
   <tr>
@@ -766,34 +708,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
           </section>
         )}
       
-      {
-      {/* Modal: รายละเอียดเครื่องของแผนกที่เลือก */}
-      {selectedDept && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-3">
-          <div className="bg-white rounded-2xl shadow-lg w-full max-w-2xl p-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-lg font-semibold">{selectedDept} ยืมบ่อยสุด</h3>
-              <button onClick={() => setSelectedDept(null)} className="px-3 py-1.5 rounded-lg border">ปิด</button>
-            </div>
-            <div className="space-y-2">
-              {topItemsForSelectedDept.length === 0 && (
-                <div className="text-sm text-slate-500">ไม่พบข้อมูล</div>
-              )}
-              {topItemsForSelectedDept.map((it) => (
-                <div key={it.key} className="flex items-center justify-between p-2 border rounded-xl">
-                  <div className="text-sm">
-                    <div className="font-medium">{it.name}</div>
-                    <div className="text-xs text-slate-500">รุ่น {it.model || '-'} · ยี่ห้อ {it.brand || '-'}</div>
-                  </div>
-                  <div className="text-sm font-semibold">× {it.count}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-/* Edit Borrow Modal */}
+      {/* Edit Borrow Modal */}
       {editingBorrowId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-lg p-4 w-full max-w-xl space-y-3">
