@@ -60,17 +60,6 @@ const Select = ({ label, value, onChange, options, disabled }: {
   </label>
 )
 
-
-// Local inline Edit icon to avoid import issues
-const EditIcon = ({ className = "w-3 h-3" }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-       stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-       className={className}>
-    <path d="M12 20h9" />
-    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-  </svg>
-);
-
 function SignaturePad({ value, onChange }: { value?: string; onChange: (dataUrl: string) => void }) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null)
   const drawing = React.useRef(false)
@@ -405,9 +394,10 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 text-slate-800">
       <header className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b">
+        <div className="mx-auto max-w-6xl px-3 sm:px-4 py-3">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
           <img src="/312501_logo_20220919143527.webp" alt="logo" className="w-9 h-9 rounded-xl object-contain border" />
-          <h1 className="text-lg font-semibold">Chularat – Medical Pool</h1>
+          <h1 className="text-lg font-semibold">Medical Pool – Supabase</h1>
           <nav className="ml-auto flex gap-1">
             {[
               {k:'dashboard', label:'แดชบอร์ด', icon: <LayoutDashboard className="w-4 h-4" />},
@@ -426,7 +416,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+      <main className="mx-auto max-w-6xl px-3 sm:px-4 py-6 space-y-6">
         {tab==='dashboard' && (
           <section className="grid md:grid-cols-3 gap-4">
             <div className="bg-white border rounded-2xl p-4 shadow-soft">
@@ -444,7 +434,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
 
             <div className="md:col-span-3 bg-white border rounded-2xl p-4">
               <h3 className="font-semibold mb-3 flex items-center gap-2"><AlertTriangle className="text-red-600" /> รายการเกิน 14 วัน</h3>
-              <div className="overflow-auto">
+              <div className="overflow-x-auto">
                 <table className="min-w-full text-sm">
                   <thead className="bg-slate-100 sticky top-0">
                     <tr>
@@ -489,7 +479,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
         {tab==='register' && (
           <section className="bg-white border rounded-2xl p-4 shadow-soft space-y-4">
             <h2 className="text-lg font-semibold">หน้าลงทะเบียน</h2>
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
               <Text label="เลขครุภัณฑ์ (Asset ID)" value={form.asset_id} onChange={v=>setForm(p=>({...p, asset_id:v}))} />
               <Text label="รหัสเครื่อง (ID CODE)" value={form.id_code} onChange={v=>setForm(p=>({...p, id_code:v}))} />
               <Text label="ชื่อเครื่องมือ" value={form.name} onChange={v=>setForm(p=>({...p, name:v}))} />
@@ -510,7 +500,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
               <button onClick={() => setForm({})} className="px-4 py-2 rounded-xl bg-slate-200">ล้างฟอร์ม</button>
             </div>
 
-            <div className="overflow-auto">
+            <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-100 sticky top-0">
                   <tr>
@@ -541,7 +531,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
                       <td className="px-3 py-2">
   <div className="flex items-center gap-2">
     <button onClick={() => startEditAsset(a)} className="px-2 py-1 rounded-lg bg-amber-500 text-white text-xs inline-flex items-center gap-1">
-      <EditIcon className="w-3 h-3" /> แก้ไข
+      <Pencil className="w-3 h-3" /> แก้ไข
     </button>
     <button onClick={() => delAsset(a.id)} className="px-2 py-1 rounded-lg bg-rose-600 text-white text-xs inline-flex items-center gap-1">
       <Trash2 className="w-3 h-3" /> ลบ
@@ -559,7 +549,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
         {tab==='borrow' && (
           <section className="bg-white border rounded-2xl p-4 shadow-soft space-y-4">
             <h2 className="text-lg font-semibold">บันทึกยืม/คืน</h2>
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
               <label className="block">
                 <span className="block text-xs text-slate-600 mb-1">เลือกเครื่อง</span>
                 <select value={borrow.asset_id ?? ''} onChange={(e)=>{
@@ -594,7 +584,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
               <button onClick={addBorrow} className="px-4 py-2 rounded-xl bg-blue-600 text-white" disabled={!borrow.asset_id || activeBorrowAssetIds.has(borrow.asset_id as string)}>บันทึกยืม</button>
             </div>
 
-            <div className="overflow-auto">
+            <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-100 sticky top-0">
                   <tr>
@@ -665,7 +655,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
               <button onClick={() => window.print()} className="px-4 py-2 rounded-xl bg-slate-200 inline-flex items-center gap-2"><Printer className="w-4 h-4"/> พิมพ์</button>
             </div>
 
-            <div className="overflow-auto">
+            <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-100 sticky top-0">
   <tr>
@@ -757,7 +747,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-lg p-4 w-full max-w-2xl space-y-4">
             <h3 className="text-lg font-semibold">แก้ไขข้อมูลเครื่อง</h3>
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
               <Text label="เลขครุภัณฑ์ (Asset ID)" value={editAsset.asset_id as any} onChange={v=>setEditAsset(p=>({...p, asset_id:v}))} />
               <Text label="รหัสเครื่อง (ID CODE)" value={editAsset.id_code as any} onChange={v=>setEditAsset(p=>({...p, id_code:v}))} />
               <Text label="ชื่อเครื่องมือ" value={editAsset.name as any} onChange={v=>setEditAsset(p=>({...p, name:v}))} />
