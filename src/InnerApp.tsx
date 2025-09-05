@@ -1,7 +1,7 @@
 import React from 'react'
 import { LayoutDashboard, Archive, Undo2, FileBarChart2, Settings as SettingsIcon, CheckCircle2, AlertTriangle, Download, Printer, Trash2, Plus } from 'lucide-react'
 import * as XLSX from 'xlsx'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { supabase } from './supabaseClient'
 
 const todayStr = (): string => new Date().toISOString().slice(0, 10)
@@ -472,8 +472,8 @@ const dashSeries = React.useMemo(() => {
   const dashTotal = React.useMemo(() => dashSeries.reduce((sum,d)=>sum+d.count,0), [dashSeries]);
   const dashAvg = React.useMemo(() => dashSeries.length? dashTotal/dashSeries.length:0, [dashSeries,dashTotal]);
 
-  const totalDash = React.useMemo(() => dashSeries.reduce((s, d) => s + d.count, 0), [dashSeries]);
-const avgDash = React.useMemo(() => dashSeries.length ? totalDash / dashSeries.length : 0, [dashSeries, totalDash]);
+  const totalDash = React.useMemo(() => borrowTrendData.reduce((s, d) => (s as number) + (d as any).count, 0), [borrowTrendData]);
+const avgDash = React.useMemo(() => borrowTrendData.length ? totalDash / borrowTrendData.length : 0, [borrowTrendData, totalDash]);
 
 const overdue = React.useMemo(() => {
 
@@ -494,7 +494,7 @@ const overdue = React.useMemo(() => {
     });
     return Object.entries(grouped).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,count])=>({date,count}));
   }, [borrows, assets, dashBranch, dashFrom, dashTo]);
-    const now = parseDate(todayStr()).getTime()
+st now = parseDate(todayStr()).getTime()
     return borrows.filter(b => !b.returned && (now - parseDate(b.start_date).getTime())/(1000*60*60*24) > 14)
   }, [borrows])
 
@@ -593,7 +593,8 @@ const overdue = React.useMemo(() => {
                   <XAxis dataKey="date" />
                   <YAxis allowDecimals={false} />
                   <Tooltip />
-                  <Line type="monotone" dataKey="count" stroke="#2563eb" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="count" stroke="#2563eb" strokeWidth={2.5} dot={false} />
+                  <ReferenceLine y={avgDash} stroke="red" strokeDasharray="4 4" label={{ value: `ค่าเฉลี่ย ${avgDash.toFixed(1)}`, position: "insideTopRight", fill: "red" }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
