@@ -6,6 +6,15 @@ import { supabase } from './supabaseClient'
 const todayStr = (): string => new Date().toISOString().slice(0, 10)
 const parseDate = (d: string): Date => new Date(d + "T00:00:00")
 
+const formatDate = (d?: string) => {
+  if (!d) return "";
+  const parts = d.split("-");
+  if (parts.length !== 3) return d as string;
+  const [y, m, day] = parts;
+  return `${day}/${m}/${y}`;
+}
+
+
 type Asset = {
   id: string;
   asset_id: string;
@@ -36,12 +45,12 @@ type Borrow = {
 
 type OptionRow = { id: string; name: string }
 
-const Text = ({ label, value, onChange, type = 'text', placeholder }: {
-  label: string; value: string | undefined; onChange?: (v: string) => void; type?: string; placeholder?: string;
+const Text = ({ label, value, onChange, type = 'text', placeholder, min, max }: {
+  label: string; value: string | undefined; onChange?: (v: string) => void; type?: string; placeholder?: string; min?: string; max?: string;
 }) => (
   <label className="block">
     <span className="block text-xs text-slate-600 mb-1">{label}</span>
-    <input type={type} value={value ?? ''} placeholder={placeholder}
+    <input type={type} value={value ?? ''} placeholder={placeholder} min={min} max={max}
       onChange={(e) => onChange?.(e.target.value)}
       className="w-full px-3 py-2.5 border rounded-xl bg-white" />
   </label>
@@ -323,6 +332,8 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
 
   const saveEditBorrow = async () => {
     if (!editingBorrowId) return
+    // validate date order
+    if (editBorrow.start_date && editBorrow.end_date && parseDate(editBorrow.end_date) < parseDate(editBorrow.start_date)) { alert('วันที่คืนต้องไม่ก่อนวันที่ยืม'); return; }
     const payload: any = {
       borrower_name: editBorrow.borrower_name ?? null,
       borrower_dept: editBorrow.borrower_dept ?? null,
@@ -339,6 +350,11 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
   const addBorrow = async () => {
   if (!borrow.asset_id) return alert('เลือกเครื่องก่อน');
   if (activeBorrowAssetIds.has(borrow.asset_id as string)) { alert('ยืมซ้ำไม่ได้: เครื่องนี้ยังไม่ได้คืน'); return; }
+
+    // validate date order
+    const s = borrow.start_date ?? todayStr();
+    const e = borrow.end_date;
+    if (e && parseDate(e) < parseDate(s)) { alert('วันที่คืนต้องไม่ก่อนวันที่ยืม'); return; }
 
     if (!borrow.asset_id) return alert('เลือกเครื่องก่อน')
     const { error } = await supabase.from('borrows').insert([borrow])
@@ -580,7 +596,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
               <Text label="ผู้ให้ยืม" value={borrow.lender_name ?? ''} onChange={v=>setBorrow(p=>({...p, lender_name:v}))} />
               <Text label="อุปกรณ์เสริมที่ให้ไป" value={borrow.peripherals ?? ''} onChange={v=>setBorrow(p=>({...p, peripherals:v}))} />
               <Text label="วันที่ยืม" type="date" value={borrow.start_date ?? todayStr()} onChange={v=>setBorrow(p=>({...p, start_date:v}))} />
-              <Text label="วันที่คืน (ถ้ามี)" type="date" value={borrow.end_date ?? ''} onChange={v=>setBorrow(p=>({...p, end_date:v}))} />
+              <Text label="วันที่คืน (ถ้ามี)" type="date" min={borrow.start_date ?? ''} value={borrow.end_date ?? ''} onChange={v=>setBorrow(p=>({...p, end_date:v}))} />
 
               <div className="md:col-span-2">
                 <span className="block text-xs text-slate-600 mb-1">ลายเซ็นผู้ขอยืม</span>
@@ -616,7 +632,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
     const asset = assets.find(a => a.id === b.asset_id)
     return (
       <tr key={b.id} className="border-b hover:bg-slate-50">
-        <td className="px-3 py-2">{b.start_date}</td>
+        <td className="px-3 py-2">{formatDate(b.start_date)}</td>
         <td className="px-3 py-2">{asset?.asset_id}</td>
         <td className="px-3 py-2">{asset?.id_code}</td>
         <td className="px-3 py-2">{asset?.name}</td>
@@ -686,7 +702,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
 <tbody>
   {reportRows.map(r => (
     <tr key={r.id} className="border-b hover:bg-slate-50">
-      <td className="px-3 py-2">{r.start_date}</td>
+      <td className="px-3 py-2">{formatDate(r.start_date)}</td>
       <td className="px-3 py-2">{r.asset_id}</td>
       <td className="px-3 py-2">{r.id_code}</td>
       <td className="px-3 py-2">{r.asset_name}</td>
@@ -737,11 +753,11 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
               <label className="text-sm">อุปกรณ์ที่ติดไป
                 <input className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.peripherals ?? ''} onChange={e=>setEditBorrow(p=>({...p, peripherals: e.target.value}))} placeholder="เช่น สายไฟ x1, เซ็นเซอร์ x2" />
               </label>
-              <label className="text-sm">วันที่ยืม (YYYY-MM-DD)
-                <input className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.start_date ?? ''} onChange={e=>setEditBorrow(p=>({...p, start_date: e.target.value}))} />
+              <label className="text-sm">วันที่ยืม
+                <input type="date" className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.start_date ?? ''} onChange={e=>setEditBorrow(p=>({...p, start_date: e.target.value}))} />
               </label>
               <label className="text-sm">วันที่คืน (ถ้ามี)
-                <input type="date" className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.end_date ?? ''} onChange={e=>setEditBorrow(p=>({...p, end_date: e.target.value}))} />
+                <input type="date" className="mt-1 w-full border rounded px-2 py-1" min={editBorrow.start_date ?? ''} value={editBorrow.end_date ?? ''} onChange={e=>setEditBorrow(p=>({...p, end_date: e.target.value}))} />
               </label>
             </div>
             <div className="flex justify-end gap-2 pt-2">
