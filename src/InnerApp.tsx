@@ -648,16 +648,8 @@ const now = parseDate(todayStr()).getTime()
               <Text label="ถึงวันที่" type="date" value={dashTo} onChange={setDashTo} />
             </div>
             <div style={{width:'100%', height:300}}>
-              <ResponsiveContainer>
-                <LineChart data={borrowTrendData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis allowDecimals={false} />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="count" stroke="#2563eb" strokeWidth={2.5} dot={false} />
-                  < y={avgDash} stroke="red" strokeDasharray="4 4" label={{ value: `ค่าเฉลี่ย ${avgDash.toFixed(1)}`, position: "insideTopRight", fill: "red" }} />
-                </LineChart>
-              </ResponsiveContainer>
+              {/* Inline SVG chart */}
+              <BorrowLineChart data={borrowTrendData as any} />
             </div>
           </section></div>
             </div>
