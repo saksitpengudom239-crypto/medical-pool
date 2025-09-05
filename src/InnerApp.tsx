@@ -536,10 +536,34 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
   }
 
     const [dashBranch, setDashBranch] = React.useState<string>('All')
+
+  // === Dashboard trend (clean) ===
+  const borrowTrendData = React.useMemo(() => {
+    const from = dashFrom ? parseDate(dashFrom).getTime() : -Infinity;
+    const to   = dashTo   ? parseDate(dashTo).getTime()   : Infinity;
+    const grouped: Record<string, number> = {};
+    borrows.forEach((b) => {
+      const t = parseDate(b.start_date).getTime();
+      if (t < from || t > to) return;
+      const a = assets.find(x => x.id === b.asset_id);
+      const branchOk = dashBranch === 'All' || (b as any).borrower_branch === dashBranch || (a?.branch ?? '') === dashBranch;
+      if (!branchOk) return;
+      grouped[b.start_date] = (grouped[b.start_date] || 0) + 1;
+    });
+    return Object.entries(grouped || {})
+      .sort((a,b)=>a[0].localeCompare(b[0]))
+      .map(([date, count]) => ({ date, count }));
+  }, [borrows, assets, dashBranch, dashFrom, dashTo]);
+
+    () => borrowTrendData.reduce((sum: number, d: any) => sum + (d?.count ?? 0), 0),
+    [borrowTrendData]
+  );
+  const avgDash = React.useMemo(
+  );
+
   const [dashFrom, setDashFrom] = React.useState('')
   const [dashTo, setDashTo] = React.useState('')
 
-const dashSeries = React.useMemo(() => {
     // build daily counts by start_date after filters
     const from = dashFrom ? new Date(dashFrom + 'T00:00:00').getTime() : -Infinity;
     const to = dashTo ? new Date(dashTo + 'T00:00:00').getTime() : Infinity;
@@ -558,11 +582,7 @@ const dashSeries = React.useMemo(() => {
     return Object.keys(counts).sort().map(d => ({ date: d, count: counts[d] }));
   }, [borrows, assets, dashBranch, dashFrom, dashTo]);
 
-  const dashTotal = React.useMemo(() => dashSeries.reduce((sum,d)=>sum+d.count,0), [dashSeries]);
-  const dashAvg = React.useMemo(() => dashSeries.length? dashTotal/dashSeries.length:0, [dashSeries,dashTotal]);
 
-  const totalDash = React.useMemo(() => borrowTrendData.reduce((s, d) => (s as number) + (d as any).count, 0), [borrowTrendData]);
-const avgDash = React.useMemo(() => borrowTrendData.length ? totalDash / borrowTrendData.length : 0, [borrowTrendData, totalDash]);
 
 const borrowTrendData = React.useMemo(() => {
     const from = dashFrom ? parseDate(dashFrom).getTime() : -Infinity;
