@@ -1,8 +1,69 @@
 import React from 'react'
 import { LayoutDashboard, Archive, Undo2, FileBarChart2, Settings as SettingsIcon, CheckCircle2, AlertTriangle, Download, Printer, Trash2, Plus } from 'lucide-react'
 import * as XLSX from 'xlsx'
-import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { supabase } from './supabaseClient'
+
+// Lightweight SVG line chart (no external deps)
+function BorrowLineChart({ data }: { data: { date: string; count: number }[] }) {
+  const width = 800, height = 240, pad = 32;
+  if (!data || data.length === 0) {
+    return <div className="text-sm text-slate-500">ไม่มีข้อมูลกราฟในช่วงที่เลือก</div>;
+  }
+  const parse = (d: string) => new Date(d + "T00:00:00").getTime();
+  const xs = data.map(d => parse(d.date));
+  const ys = data.map(d => d.count);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = 0, maxY = Math.max(1, Math.max(...ys));
+
+  const sx = (x: number) => pad + (maxX === minX ? 0 : (x - minX) / (maxX - minX) * (width - 2 * pad));
+  const sy = (y: number) => (height - pad) - (maxY === minY ? 0 : (y - minY) / (maxY - minY) * (height - 2 * pad));
+
+  const points = data.map(d => `${sx(parse(d.date)).toFixed(1)},${sy(d.count).toFixed(1)}`).join(" ");
+
+  // y ticks (0, max/2, max)
+  const yTicks = [0, Math.ceil(maxY/2), maxY];
+
+  // x ticks: first, middle, last
+  const xTicksIdx = [0, Math.floor(data.length/2), data.length-1].filter((v, i, arr) => arr.indexOf(v) === i);
+  const format = (d: string) => {
+    const [y,m,day] = d.split("-");
+    return `${day}/${m}`;
+  };
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-64">
+      {/* grid */}
+      {yTicks.map((t,i)=>(
+        <g key={i}>
+          <line x1={pad} y1={sy(t)} x2={width-pad} y2={sy(t)} stroke="#e5e7eb" strokeDasharray="3 3" />
+          <text x={4} y={sy(t)+4} fontSize="10" fill="#64748b">{t}</text>
+        </g>
+      ))}
+      {/* axes */}
+      <line x1={pad} y1={pad} x2={pad} y2={height-pad} stroke="#94a3b8" />
+      <line x1={pad} y1={height-pad} x2={width-pad} y2={height-pad} stroke="#94a3b8" />
+
+      {/* x ticks */}
+      {xTicksIdx.map((idx, i)=>{
+        const x = sx(xs[idx]);
+        return (
+          <g key={i}>
+            <line x1={x} y1={height-pad} x2={x} y2={height-pad+4} stroke="#94a3b8" />
+            <text x={x} y={height-pad+14} fontSize="10" textAnchor="middle" fill="#64748b">{format(data[idx].date)}</text>
+          </g>
+        );
+      })}
+
+      {/* line */}
+      <polyline fill="none" stroke="#2563eb" strokeWidth="2.5" points={points} />
+      {/* dots */}
+      {data.map((d,i)=>(
+        <circle key={i} cx={sx(xs[i])} cy={sy(ys[i])} r="2" fill="#2563eb" />
+      ))}
+    </svg>
+  );
+}
+
 
 const todayStr = (): string => new Date().toISOString().slice(0, 10)
 const parseDate = (d: string): Date => new Date(d + "T00:00:00")
@@ -594,7 +655,7 @@ const now = parseDate(todayStr()).getTime()
                   <YAxis allowDecimals={false} />
                   <Tooltip />
                   <Line type="monotone" dataKey="count" stroke="#2563eb" strokeWidth={2.5} dot={false} />
-                  <ReferenceLine y={avgDash} stroke="red" strokeDasharray="4 4" label={{ value: `ค่าเฉลี่ย ${avgDash.toFixed(1)}`, position: "insideTopRight", fill: "red" }} />
+                  < y={avgDash} stroke="red" strokeDasharray="4 4" label={{ value: `ค่าเฉลี่ย ${avgDash.toFixed(1)}`, position: "insideTopRight", fill: "red" }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
