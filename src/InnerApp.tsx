@@ -3,6 +3,20 @@ import { LayoutDashboard, Archive, Undo2, FileBarChart2, Settings as SettingsIco
 import * as XLSX from 'xlsx'
 import { supabase } from './supabaseClient'
 
+// === NEW: Recharts for graphs ===
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  Legend,
+  CartesianGrid
+} from 'recharts'
+
 const todayStr = (): string => new Date().toISOString().slice(0, 10)
 const parseDate = (d: string): Date => new Date(d + "T00:00:00")
 
@@ -211,18 +225,52 @@ function OptionEditor({ table, title }: { table: 'brands'|'vendors'|'departments
   )
 }
 
+// === NEW: helpers for charts ===
+type DeptUsage = { dept: string; count: number }
+type MonthlyTrendPoint = { month: string; borrow: number; return: number }
+
+const monthLabel = (iso?: string | null) => {
+  if (!iso) return "";
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleString("en-US", { month: "short" }); // Jan, Feb, ...
+};
+const buildTopDepartments = (borrows: Borrow[]): DeptUsage[] => {
+  const map = new Map<string, number>();
+  for (const b of borrows) {
+    const key = (b.borrower_dept || "Unknown").trim();
+    map.set(key, (map.get(key) || 0) + 1);
+  }
+  return Array.from(map.entries())
+    .map(([dept, count]) => ({ dept, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+};
+const buildMonthlyTrend = (borrows: Borrow[]): MonthlyTrendPoint[] => {
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const agg: Record<string, { borrow: number; return: number }> = {};
+  for (const m of months) agg[m] = { borrow: 0, return: 0 };
+
+  for (const b of borrows) {
+    const bm = monthLabel(b.start_date);
+    if (bm && agg[bm]) agg[bm].borrow += 1;
+    const rm = monthLabel(b.end_date);
+    if (rm && agg[rm]) agg[rm].return += 1;
+  }
+  return months.map((m) => ({ month: m, ...agg[m] }));
+};
+
 export default function App() {
   const [tab, setTab] = React.useState<'dashboard'|'register'|'borrow'|'report'|'settings'>('dashboard')
 
   const [assets, setAssets] = React.useState<Asset[]>([])
   const [borrows, setBorrows] = React.useState<Borrow[]>([])
 
-// รายชื่อ asset_id ที่ยังไม่คืน (กันยืมซ้ำ)
-const activeBorrowAssetIds = React.useMemo(() => {
-  const ids = new Set<string>();
-  borrows.forEach(b => { if (!b.returned) ids.add(b.asset_id); });
-  return ids;
-}, [borrows]);
+  // รายชื่อ asset_id ที่ยังไม่คืน (กันยืมซ้ำ)
+  const activeBorrowAssetIds = React.useMemo(() => {
+    const ids = new Set<string>();
+    borrows.forEach(b => { if (!b.returned) ids.add(b.asset_id); });
+    return ids;
+  }, [borrows]);
 
   // dynamic option lists from Supabase
   const [brandOpts, setBrandOpts] = React.useState<string[]>([])
@@ -325,7 +373,7 @@ const activeBorrowAssetIds = React.useMemo(() => {
     await loadAssets()
     cancelEditAsset()
   }
-const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayStr(), borrower_signature: '' })
+  const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayStr(), borrower_signature: '' })
 
   // === Borrow edit modal state ===
   const [editingBorrowId, setEditingBorrowId] = React.useState<string | null>(null)
@@ -368,17 +416,15 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
   }
 
   const addBorrow = async () => {
-  if (!borrow.asset_id) return alert('เลือกเครื่องก่อน')
+    if (!borrow.asset_id) return alert('เลือกเครื่องก่อน')
     if (!borrow.borrower_dept || !borrow.borrower_branch) { alert('ต้องเลือกแผนก/สาขาผู้ยืม'); return; };
-  if (activeBorrowAssetIds.has(borrow.asset_id as string)) { alert('ยืมซ้ำไม่ได้: เครื่องนี้ยังไม่ได้คืน'); return; }
+    if (activeBorrowAssetIds.has(borrow.asset_id as string)) { alert('ยืมซ้ำไม่ได้: เครื่องนี้ยังไม่ได้คืน'); return; }
 
     // validate date order
     const s = borrow.start_date ?? todayStr();
     const e = borrow.end_date;
     if (e && parseDate(e) < parseDate(s)) { alert('วันที่คืนต้องไม่ก่อนวันที่ยืม'); return; }
 
-    if (!borrow.asset_id) return alert('เลือกเครื่องก่อน')
-    if (!borrow.borrower_dept || !borrow.borrower_branch) { alert('ต้องเลือกแผนก/สาขาผู้ยืม'); return; }
     const { error } = await supabase.from('borrows').insert([borrow])
     if (error) return alert('บันทึกไม่สำเร็จ: ' + error.message)
     alert('บันทึกยืมแล้ว')
@@ -395,47 +441,47 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
   const [reportDept, setReportDept] = React.useState<string>('All')
   const [dateTo, setDateTo] = React.useState('')
   const reportRows = React.useMemo(() => {
-  const from = dateFrom ? parseDate(dateFrom).getTime() : -Infinity;
-  const to   = dateTo   ? parseDate(dateTo).getTime()   : Infinity;
+    const from = dateFrom ? parseDate(dateFrom).getTime() : -Infinity;
+    const to   = dateTo   ? parseDate(dateTo).getTime()   : Infinity;
 
-  return borrows
-    .filter(b => {
-      const t = parseDate(b.start_date).getTime();
-      const inRange = t >= from && t <= to;
-      if (!inRange) return false;
-      // เพิ่มเงื่อนไขกรอง แผนก/สาขา
-      const a = assets.find(x => x.id === b.asset_id);
-      const deptOk = reportDept === 'All' || b.borrower_dept === reportDept || (a?.department ?? '') === reportDept;
-      const branchOk = reportBranch === 'All' || (b as any).borrower_branch === reportBranch || (a?.branch ?? '') === reportBranch;
-      return deptOk && branchOk;
-    })
-    .map(b => {
-      const a = assets.find(x => x.id === b.asset_id); // หา asset ครั้งเดียว
-      return {
-        id: b.id,
-        start_date: b.start_date,
+    return borrows
+      .filter(b => {
+        const t = parseDate(b.start_date).getTime();
+        const inRange = t >= from && t <= to;
+        if (!inRange) return false;
+        // เพิ่มเงื่อนไขกรอง แผนก/สาขา
+        const a = assets.find(x => x.id === b.asset_id);
+        const deptOk = reportDept === 'All' || b.borrower_dept === reportDept || (a?.department ?? '') === reportDept;
+        const branchOk = reportBranch === 'All' || (b as any).borrower_branch === reportBranch || (a?.branch ?? '') === reportBranch;
+        return deptOk && branchOk;
+      })
+      .map(b => {
+        const a = assets.find(x => x.id === b.asset_id); // หา asset ครั้งเดียว
+        return {
+          id: b.id,
+          start_date: b.start_date,
 
-        // ✅ คอลัมน์ใหม่ที่อยากเพิ่มในรายงาน
-        asset_id: a?.asset_id ?? "",   // เลขครุภัณฑ์
-        id_code:  a?.id_code  ?? "",   // รหัสเครื่อง
-        asset_name: a?.name   ?? "",   // เครื่อง (ชื่อเครื่อง)
-        brand:    a?.brand    ?? "",
-        model:    a?.model    ?? "",
-        serial:   a?.serial   ?? "",   // S/N
+          // ✅ คอลัมน์เพิ่มสำหรับรายงาน
+          asset_id: a?.asset_id ?? "",   // เลขครุภัณฑ์
+          id_code:  a?.id_code  ?? "",   // รหัสเครื่อง
+          asset_name: a?.name   ?? "",   // เครื่อง (ชื่อเครื่อง)
+          brand:    a?.brand    ?? "",
+          model:    a?.model    ?? "",
+          serial:   a?.serial   ?? "",   // S/N
 
-        // ผู้ยืม/แผนก
-        borrower_name: b.borrower_name ?? "",
-        borrower_dept: b.borrower_dept ?? "",
-        borrower_branch: (b as any).borrower_branch ?? "",
-        asset_branch: a?.branch ?? "",
+          // ผู้ยืม/แผนก
+          borrower_name: b.borrower_name ?? "",
+          borrower_dept: b.borrower_dept ?? "",
+          borrower_branch: (b as any).borrower_branch ?? "",
+          asset_branch: a?.branch ?? "",
 
-        // ลายเซ็น / สถานะคืน
-        has_signature: b.borrower_signature ? "✔" : "✘",
-        returned: !!b.returned,
-        end_date: b.end_date ?? ""
-      };
-    });
-}, [borrows, assets, dateFrom, dateTo, reportDept, reportBranch]);
+          // ลายเซ็น / สถานะคืน
+          has_signature: b.borrower_signature ? "✔" : "✘",
+          returned: !!b.returned,
+          end_date: b.end_date ?? ""
+        };
+      });
+  }, [borrows, assets, dateFrom, dateTo, reportDept, reportBranch]);
 
   const exportXLSX = () => {
     const exportable = reportRows.map(({ borrower_signature, ...rest }) => rest)
@@ -450,83 +496,156 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
     return borrows.filter(b => !b.returned && (now - parseDate(b.start_date).getTime())/(1000*60*60*24) > 14)
   }, [borrows])
 
+  // === NEW: derived data for charts ===
+  const totalAssets = assets.length;
+  const inUseCount = borrows.filter(b=>!b.returned).length;
+  const utilization = totalAssets ? Math.round((inUseCount / totalAssets) * 100) : 0;
+  const topDepartments = React.useMemo(() => buildTopDepartments(borrows), [borrows]);
+  const monthlyTrend = React.useMemo(() => buildMonthlyTrend(borrows), [borrows]);
+
+  // Drill-down state
+  const [selectedDept, setSelectedDept] = React.useState<string | null>(null);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 text-slate-800">
       <header className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b">
-  <div className="mx-auto max-w-6xl px-3 sm:px-4 py-3 flex items-center gap-3">
-    <img src="/312501_logo_20220919143527.webp" alt="logo" className="w-9 h-9 rounded-xl object-contain border" />
-    <h1 className="text-lg font-semibold">Chularat – Medical Pool</h1>
-    <nav className="ml-auto flex gap-1 overflow-x-auto no-scrollbar">
-      {[
-        {k:'dashboard', label:'แดชบอร์ด', icon: <LayoutDashboard className="w-4 h-4" />},
-        {k:'register', label:'ลงทะเบียน', icon: <Archive className="w-4 h-4" />},
-        {k:'borrow', label:'บันทึกยืม/คืน', icon: <Undo2 className="w-4 h-4" />},
-        {k:'report', label:'รายงาน', icon: <FileBarChart2 className="w-4 h-4" />},
-        {k:'settings', label:'ตั้งค่า', icon: <SettingsIcon className="w-4 h-4" />},
-      ].map((t:any) => (
-        <button key={t.k} onClick={() => setTab(t.k as any)}
-          className={`px-3 py-1.5 rounded-xl text-sm border ${tab===t.k?'bg-blue-600 text-white border-blue-600':'bg-white hover:bg-slate-50'}`}>
-          <span className="inline-flex items-center gap-1">{t.icon} {t.label}</span>
-        </button>
-      ))}
-    </nav>
-    <button onClick={async()=>{await supabase.auth.signOut(); location.reload();}} className="ml-2 px-3 py-1.5 rounded-xl text-sm border bg-white hover:bg-slate-50">ออกจากระบบ</button>
-  </div>
-</header>
+        <div className="mx-auto max-w-6xl px-3 sm:px-4 py-3 flex items-center gap-3">
+          <img src="/312501_logo_20220919143527.webp" alt="logo" className="w-9 h-9 rounded-xl object-contain border" />
+          <h1 className="text-lg font-semibold">Chularat – Medical Pool</h1>
+          <nav className="ml-auto flex gap-1 overflow-x-auto no-scrollbar">
+            {[
+              {k:'dashboard', label:'แดชบอร์ด', icon: <LayoutDashboard className="w-4 h-4" />},
+              {k:'register', label:'ลงทะเบียน', icon: <Archive className="w-4 h-4" />},
+              {k:'borrow', label:'บันทึกยืม/คืน', icon: <Undo2 className="w-4 h-4" />},
+              {k:'report', label:'รายงาน', icon: <FileBarChart2 className="w-4 h-4" />},
+              {k:'settings', label:'ตั้งค่า', icon: <SettingsIcon className="w-4 h-4" />},
+            ].map((t:any) => (
+              <button key={t.k} onClick={() => setTab(t.k as any)}
+                className={`px-3 py-1.5 rounded-xl text-sm border ${tab===t.k?'bg-blue-600 text-white border-blue-600':'bg-white hover:bg-slate-50'}`}>
+                <span className="inline-flex items-center gap-1">{t.icon} {t.label}</span>
+              </button>
+            ))}
+          </nav>
+          <button onClick={async()=>{await supabase.auth.signOut(); location.reload();}} className="ml-2 px-3 py-1.5 rounded-xl text-sm border bg-white hover:bg-slate-50">ออกจากระบบ</button>
+        </div>
+      </header>
 
       <main className="mx-auto max-w-6xl px-3 sm:px-4 py-6 space-y-6">
         {tab==='dashboard' && (
           <section className="grid md:grid-cols-3 gap-4">
+            {/* Cards */}
             <div className="bg-white border rounded-2xl p-4 shadow-soft">
               <div className="text-sm text-slate-600">จำนวนเครื่อง</div>
               <div className="text-2xl font-semibold">{assets.length}</div>
             </div>
             <div className="bg-white border rounded-2xl p-4 shadow-soft">
               <div className="text-sm text-slate-600">กำลังยืม</div>
-              <div className="text-2xl font-semibold">{borrows.filter(b=>!b.returned).length}</div>
+              <div className="text-2xl font-semibold">{inUseCount}</div>
             </div>
             <div className="bg-white border rounded-2xl p-4 shadow-soft">
               <div className="text-sm text-slate-600">เกินกำหนด 14 วัน</div>
               <div className="text-2xl font-semibold text-red-600">{overdue.length}</div>
             </div>
 
+            {/* === NEW: Utilization % Card === */}
+            <div className="md:col-span-3 bg-white border rounded-2xl p-4 shadow-soft">
+              <div className="flex items-center justify-between gap-6">
+                <div>
+                  <h3 className="text-sm text-slate-600">Utilization Rate</h3>
+                  <div className="mt-2 flex items-end gap-2">
+                    <span className="text-3xl font-semibold">{utilization}%</span>
+                    <span className="text-sm text-slate-500">กำลังยืม / จำนวนเครื่อง</span>
+                  </div>
+                </div>
+                {/* simple bar as progress */}
+                <div className="w-56 h-3 rounded-full bg-slate-200 overflow-hidden">
+                  <div className="h-full bg-blue-600" style={{ width: `${utilization}%` }} />
+                </div>
+              </div>
+            </div>
+
+            {/* === NEW: Charts Row === */}
+            <div className="bg-white border rounded-2xl p-4 shadow-soft">
+              <h3 className="font-semibold mb-3 flex items-center gap-2"><AlertTriangle className="text-blue-600" />Top 5 แผนกที่ยืมบ่อย</h3>
+              <div style={{ width: '100%', height: 260 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={topDepartments.length ? topDepartments : [{dept:'-', count:0}]}>
+                    <XAxis dataKey="dept" />
+                    <YAxis allowDecimals={false} />
+                    <Tooltip />
+                    <Bar dataKey="count" onClick={(d:any)=> setSelectedDept(d.dept)} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="bg-white border rounded-2xl p-4 shadow-soft">
+              <h3 className="font-semibold mb-3">Trend รายเดือน (Borrow / Return)</h3>
+              <div style={{ width: '100%', height: 260 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={monthlyTrend}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis allowDecimals={false} />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="borrow" name="Borrow" />
+                    <Line type="monotone" dataKey="return" name="Return" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Existing overdue table */}
             <div className="md:col-span-3 bg-white border rounded-2xl p-4">
               <h3 className="font-semibold mb-3 flex items-center gap-2"><AlertTriangle className="text-red-600" /> รายการเกิน 14 วัน</h3>
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm">
                   <thead className="bg-slate-100 sticky top-0">
                     <tr>
-    <th className="text-left px-3 py-2">เลขครุภัณฑ์</th>
-    <th className="text-left px-3 py-2">รหัสเครื่อง</th>
-    <th className="text-left px-3 py-2">เครื่อง</th>
-    <th className="text-left px-3 py-2">ยี่ห้อ</th>
-    <th className="text-left px-3 py-2">รุ่น</th>
-    <th className="text-left px-3 py-2">S/N</th>
-    <th className="text-left px-3 py-2">ผู้ยืม</th>
-    <th className="text-left px-3 py-2">แผนก</th>
-    <th className="text-left px-3 py-2">วันที่ยืม</th>
-    <th className="text-left px-3 py-2">คืน</th>
+                      <th className="text-left px-3 py-2">เลขครุภัณฑ์</th>
+                      <th className="text-left px-3 py-2">รหัสเครื่อง</th>
+                      <th className="text-left px-3 py-2">เครื่อง</th>
+                      <th className="text-left px-3 py-2">ยี่ห้อ</th>
+                      <th className="text-left px-3 py-2">รุ่น</th>
+                      <th className="text-left px-3 py-2">S/N</th>
+                      <th className="text-left px-3 py-2">ผู้ยืม</th>
+                      <th className="text-left px-3 py-2">แผนก</th>
+                      <th className="text-left px-3 py-2">วันที่ยืม</th>
+                      <th className="text-left px-3 py-2">คืน</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {overdue.map(b => (
-                      <tr key={b.id} className="border-b hover:bg-slate-50">
-                        <td className="px-3 py-2">
-      {b.returned ? (
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700 text-xs">✔ คืนแล้ว</span>
-          <button onClick={() => startEditBorrow(b)} className="ml-2 px-2 py-1 rounded bg-slate-600 text-white text-xs">แก้ไข</button>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-100 text-rose-700 text-xs">✘ ยังไม่คืน</span>
-          <button onClick={() => markReturned(b.id)} className="px-2 py-1 rounded-lg bg-emerald-600 text-white text-xs">ทำเครื่องหมายคืนแล้ว</button>
-          <button onClick={() => startEditBorrow(b)} className="px-2 py-1 rounded bg-slate-600 text-white text-xs">แก้ไข</button>
-        </div>
-      )}
-    </td>
-                      </tr>
-                    ))}
+                    {overdue.map(b => {
+                      const a = assets.find(x => x.id === b.asset_id);
+                      return (
+                        <tr key={b.id} className="border-b hover:bg-slate-50">
+                          <td className="px-3 py-2">{a?.asset_id || '-'}</td>
+                          <td className="px-3 py-2">{a?.id_code || '-'}</td>
+                          <td className="px-3 py-2">{a?.name || '-'}</td>
+                          <td className="px-3 py-2">{a?.brand || '-'}</td>
+                          <td className="px-3 py-2">{a?.model || '-'}</td>
+                          <td className="px-3 py-2">{a?.serial || '-'}</td>
+                          <td className="px-3 py-2">{b.borrower_name || '-'}</td>
+                          <td className="px-3 py-2">{b.borrower_dept || '-'}</td>
+                          <td className="px-3 py-2">{formatDate(b.start_date)}</td>
+                          <td className="px-3 py-2">
+                            {b.returned ? (
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700 text-xs">✔ คืนแล้ว</span>
+                                <button onClick={() => startEditBorrow(b)} className="ml-2 px-2 py-1 rounded bg-slate-600 text-white text-xs">แก้ไข</button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-100 text-rose-700 text-xs">✘ ยังไม่คืน</span>
+                                <button onClick={() => markReturned(b.id)} className="px-2 py-1 rounded-lg bg-emerald-600 text-white text-xs">ทำเครื่องหมายคืนแล้ว</button>
+                                <button onClick={() => startEditBorrow(b)} className="px-2 py-1 rounded bg-slate-600 text-white text-xs">แก้ไข</button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -586,15 +705,15 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
                       <td className="px-3 py-2 hidden sm:table-cell">{a.branch || "-"}</td>
                       <td className="px-3 py-2">{a.location || "-"}</td>
                       <td className="px-3 py-2">
-  <div className="flex items-center gap-2">
-    <button onClick={() => startEditAsset(a)} className="px-2 py-1 rounded-lg bg-amber-500 text-white text-xs inline-flex items-center gap-1">
-      <EditIcon className="w-3 h-3" /> แก้ไข
-    </button>
-    <button onClick={() => delAsset(a.id)} className="px-2 py-1 rounded-lg bg-rose-600 text-white text-xs inline-flex items-center gap-1">
-      <Trash2 className="w-3 h-3" /> ลบ
-    </button>
-  </div>
-</td>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => startEditAsset(a)} className="px-2 py-1 rounded-lg bg-amber-500 text-white text-xs inline-flex items-center gap-1">
+                            <EditIcon className="w-3 h-3" /> แก้ไข
+                          </button>
+                          <button onClick={() => delAsset(a.id)} className="px-2 py-1 rounded-lg bg-rose-600 text-white text-xs inline-flex items-center gap-1">
+                            <Trash2 className="w-3 h-3" /> ลบ
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -613,6 +732,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
                   const id = e.target.value;
                   if (id && activeBorrowAssetIds.has(id)) {
                     alert('เครื่องนี้ติดยืมอยู่ — ยืมซ้ำไม่ได้');
+                    (e.target as HTMLSelectElement).value = '';
                     setBorrow(p=>({ ...p, asset_id: '' }));
                     return;
                   }
@@ -646,51 +766,51 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-100 sticky top-0">
                   <tr>
-                        <th className="px-3 py-2 text-left">วันที่ยืม</th>
-                        <th className="px-3 py-2 text-left">ครุภัณฑ์/รหัส</th>
-                        <th className="px-3 py-2 text-left">เครื่อง</th>
-                        <th className="px-3 py-2 text-left hidden md:table-cell">ยี่ห้อ/รุ่น</th>
-                        <th className="px-3 py-2 text-left hidden md:table-cell">S/N</th>
-                        <th className="px-3 py-2 text-left">ผู้ยืม</th>
-                        <th className="px-3 py-2 text-left hidden sm:table-cell">แผนก</th>
-                        <th className="px-3 py-2 text-left hidden sm:table-cell">สาขา</th>
-                        <th className="px-3 py-2 text-left hidden md:table-cell">มีลายเซ็น</th>
-                        <th className="px-3 py-2 text-left">คืน</th>
+                    <th className="px-3 py-2 text-left">วันที่ยืม</th>
+                    <th className="px-3 py-2 text-left">ครุภัณฑ์/รหัส</th>
+                    <th className="px-3 py-2 text-left">เครื่อง</th>
+                    <th className="px-3 py-2 text-left hidden md:table-cell">ยี่ห้อ/รุ่น</th>
+                    <th className="px-3 py-2 text-left hidden md:table-cell">S/N</th>
+                    <th className="px-3 py-2 text-left">ผู้ยืม</th>
+                    <th className="px-3 py-2 text-left hidden sm:table-cell">แผนก</th>
+                    <th className="px-3 py-2 text-left hidden sm:table-cell">สาขา</th>
+                    <th className="px-3 py-2 text-left hidden md:table-cell">มีลายเซ็น</th>
+                    <th className="px-3 py-2 text-left">คืน</th>
                   </tr>
                 </thead>
-<tbody>
-  {borrows.map(b => {
-    const asset = assets.find(a => a.id === b.asset_id)
-    return (
-      <tr key={b.id} className="border-b hover:bg-slate-50">
-        <td className="px-3 py-2">{formatDate(b.start_date)}</td>
-        <td className="px-3 py-2">{asset?.asset_id ? asset.asset_id : '-'}{asset?.id_code ? ` / ${asset.id_code}` : ""}</td>
-        <td className="px-3 py-2">{asset?.name}</td>
-        <td className="px-3 py-2 hidden md:table-cell">{[asset?.brand, asset?.model].filter(Boolean).join(" / ")}</td>
-        <td className="px-3 py-2 hidden md:table-cell">{asset?.serial || "-"}</td>
-        <td className="px-3 py-2">{b.borrower_name}</td>
-        <td className="px-3 py-2 hidden sm:table-cell">{b.borrower_dept}</td>
-        <td className="px-3 py-2 hidden sm:table-cell">{(b as any).borrower_branch ?? '-'}</td>
-        <td className="px-3 py-2 hidden md:table-cell">
-          {b.borrower_signature ? <span className="text-green-600">✔</span> : <span className="text-red-600">✘</span>}
-        </td>
-        <td className="px-3 py-2">
-  {b.returned ? (
-    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700 text-xs">✔ คืนแล้ว</span>
-  ) : (
-    <details className="relative">
-      <summary className="px-2 py-1 rounded-lg border cursor-pointer select-none">⋮</summary>
-      <div className="absolute right-0 mt-1 w-44 bg-white border rounded-lg shadow z-10">
-        <button onClick={() => markReturned(b.id)} className="w-full text-left px-3 py-2 hover:bg-slate-50">ทำเครื่องหมายคืนแล้ว</button>
-        <button onClick={() => startEditBorrow(b)} className="w-full text-left px-3 py-2 hover:bg-slate-50">แก้ไข</button>
-      </div>
-    </details>
-  )}
-</td>
-      		</tr>
-   	 	)
-  		})}
-		</tbody>
+                <tbody>
+                  {borrows.map(b => {
+                    const asset = assets.find(a => a.id === b.asset_id)
+                    return (
+                      <tr key={b.id} className="border-b hover:bg-slate-50">
+                        <td className="px-3 py-2">{formatDate(b.start_date)}</td>
+                        <td className="px-3 py-2">{asset?.asset_id ? asset.asset_id : '-'}{asset?.id_code ? ` / ${asset.id_code}` : ""}</td>
+                        <td className="px-3 py-2">{asset?.name}</td>
+                        <td className="px-3 py-2 hidden md:table-cell">{[asset?.brand, asset?.model].filter(Boolean).join(" / ")}</td>
+                        <td className="px-3 py-2 hidden md:table-cell">{asset?.serial || "-"}</td>
+                        <td className="px-3 py-2">{b.borrower_name}</td>
+                        <td className="px-3 py-2 hidden sm:table-cell">{b.borrower_dept}</td>
+                        <td className="px-3 py-2 hidden sm:table-cell">{(b as any).borrower_branch ?? '-'}</td>
+                        <td className="px-3 py-2 hidden md:table-cell">
+                          {b.borrower_signature ? <span className="text-green-600">✔</span> : <span className="text-red-600">✘</span>}
+                        </td>
+                        <td className="px-3 py-2">
+                          {b.returned ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700 text-xs">✔ คืนแล้ว</span>
+                          ) : (
+                            <details className="relative">
+                              <summary className="px-2 py-1 rounded-lg border cursor-pointer select-none">⋮</summary>
+                              <div className="absolute right-0 mt-1 w-44 bg-white border rounded-lg shadow z-10">
+                                <button onClick={() => markReturned(b.id)} className="w-full text-left px-3 py-2 hover:bg-slate-50">ทำเครื่องหมายคืนแล้ว</button>
+                                <button onClick={() => startEditBorrow(b)} className="w-full text-left px-3 py-2 hover:bg-slate-50">แก้ไข</button>
+                              </div>
+                            </details>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
               </table>
             </div>
           </section>
@@ -711,38 +831,38 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-100 sticky top-0">
-  <tr>
-    <th className="px-3 py-2 text-left">วันที่ยืม</th>
-    <th className="px-3 py-2 text-left">ครุภัณฑ์/รหัส</th>
-    <th className="px-3 py-2 text-left">เครื่อง</th>
-    <th className="px-3 py-2 text-left hidden md:table-cell">ยี่ห้อ/รุ่น</th>
-    <th className="px-3 py-2 text-left hidden md:table-cell">S/N</th>
-    <th className="px-3 py-2 text-left">ผู้ยืม</th>
-    <th className="px-3 py-2 text-left hidden sm:table-cell">แผนก</th>
-    <th className="px-3 py-2 text-left hidden sm:table-cell">สาขา (ผู้ยืม)</th>
-    <th className="px-3 py-2 text-left hidden sm:table-cell">สาขา (เครื่อง)</th>
-    <th className="px-3 py-2 text-left hidden md:table-cell">มีลายเซ็น</th>
-    <th className="px-3 py-2 text-left">คืน</th>
-  </tr>
-</thead>
+                  <tr>
+                    <th className="px-3 py-2 text-left">วันที่ยืม</th>
+                    <th className="px-3 py-2 text-left">ครุภัณฑ์/รหัส</th>
+                    <th className="px-3 py-2 text-left">เครื่อง</th>
+                    <th className="px-3 py-2 text-left hidden md:table-cell">ยี่ห้อ/รุ่น</th>
+                    <th className="px-3 py-2 text-left hidden md:table-cell">S/N</th>
+                    <th className="px-3 py-2 text-left">ผู้ยืม</th>
+                    <th className="px-3 py-2 text-left hidden sm:table-cell">แผนก</th>
+                    <th className="px-3 py-2 text-left hidden sm:table-cell">สาขา (ผู้ยืม)</th>
+                    <th className="px-3 py-2 text-left hidden sm:table-cell">สาขา (เครื่อง)</th>
+                    <th className="px-3 py-2 text-left hidden md:table-cell">มีลายเซ็น</th>
+                    <th className="px-3 py-2 text-left">คืน</th>
+                  </tr>
+                </thead>
 
-<tbody>
-  {reportRows.map(r => (
-    <tr key={r.id} className="border-b hover:bg-slate-50">
-      <td className="px-3 py-2">{formatDate(r.start_date)}</td>
-      <td className="px-3 py-2">{r.asset_id ? r.asset_id : "-"}{r.id_code ? " / " + r.id_code : ""}</td>
-      <td className="px-3 py-2">{r.asset_name}</td>
-      <td className="px-3 py-2 hidden md:table-cell">{[r.brand, r.model].filter(Boolean).join(" / ")}</td>
-      <td className="px-3 py-2 hidden md:table-cell">{r.serial || "-"}</td>
-      <td className="px-3 py-2">{r.borrower_name}</td>
-      <td className="px-3 py-2 hidden sm:table-cell">{r.borrower_dept || "-"}</td>
-      <td className="px-3 py-2 hidden sm:table-cell">{r.borrower_branch || "-"}</td>
-      <td className="px-3 py-2 hidden sm:table-cell">{r.asset_branch || "-"}</td>
-      <td className="px-3 py-2 hidden md:table-cell">{r.has_signature === "✔" ? "✔" : "✘"}</td>
-      <td className="px-3 py-2">{r.returned ? "✔" : "✘"}</td>
-    </tr>
-  ))}
-</tbody>
+                <tbody>
+                  {reportRows.map(r => (
+                    <tr key={r.id} className="border-b hover:bg-slate-50">
+                      <td className="px-3 py-2">{formatDate(r.start_date)}</td>
+                      <td className="px-3 py-2">{r.asset_id ? r.asset_id : "-"}{r.id_code ? " / " + r.id_code : ""}</td>
+                      <td className="px-3 py-2">{r.asset_name}</td>
+                      <td className="px-3 py-2 hidden md:table-cell">{[r.brand, r.model].filter(Boolean).join(" / ")}</td>
+                      <td className="px-3 py-2 hidden md:table-cell">{r.serial || "-"}</td>
+                      <td className="px-3 py-2">{r.borrower_name}</td>
+                      <td className="px-3 py-2 hidden sm:table-cell">{r.borrower_dept || "-"}</td>
+                      <td className="px-3 py-2 hidden sm:table-cell">{r.borrower_branch || "-"}</td>
+                      <td className="px-3 py-2 hidden sm:table-cell">{r.asset_branch || "-"}</td>
+                      <td className="px-3 py-2 hidden md:table-cell">{/* has_signature shown as ✔/✘ in export only */}</td>
+                      <td className="px-3 py-2">{r.returned ? "✔" : "✘"}</td>
+                    </tr>
+                  ))}
+                </tbody>
               </table>
             </div>
           </section>
@@ -763,74 +883,121 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
           </section>
         )}
       
-      {/* Edit Borrow Modal */}
-      {editingBorrowId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-lg p-4 w-full max-w-xl space-y-3">
-            <h3 className="text-lg font-semibold">แก้ไขรายการยืม/คืน</h3>
-            <div className="grid md:grid-cols-2 gap-3">
-              <label className="text-sm">ผู้ยืม
-                <input className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.borrower_name ?? ''} onChange={e=>setEditBorrow(p=>({...p, borrower_name: e.target.value}))} />
-              </label>
-              <label className="text-sm">แผนกผู้ยืม
-                <input className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.borrower_dept ?? ''} onChange={e=>setEditBorrow(p=>({...p, borrower_dept: e.target.value}))} />
-              </label>
-              <label className="text-sm">สาขาผู้ยืม
-                <select className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.borrower_branch ?? ''} onChange={e=>setEditBorrow(p=>({...p, borrower_branch: e.target.value}))}>
-                  <option value="">-- เลือก --</option>
-                  {branchOpts.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
-              </label>
-              <label className="text-sm">ผู้ปล่อยยืม (ผู้รับผิดชอบ)
-                <input className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.lender_name ?? ''} onChange={e=>setEditBorrow(p=>({...p, lender_name: e.target.value}))} />
-              </label>
-              <label className="text-sm">อุปกรณ์ที่ติดไป
-                <input className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.peripherals ?? ''} onChange={e=>setEditBorrow(p=>({...p, peripherals: e.target.value}))} placeholder="เช่น สายไฟ x1, เซ็นเซอร์ x2" />
-              </label>
-              <label className="text-sm">วันที่ยืม
-                <input type="date" className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.start_date ?? ''} onChange={e=>setEditBorrow(p=>({...p, start_date: e.target.value}))} />
-              </label>
-              <label className="text-sm">วันที่คืน (ถ้ามี)
-                <input type="date" className="mt-1 w-full border rounded px-2 py-1" min={editBorrow.start_date ?? ''} value={editBorrow.end_date ?? ''} onChange={e=>setEditBorrow(p=>({...p, end_date: e.target.value}))} />
-              </label>
+        {/* Edit Borrow Modal */}
+        {editingBorrowId && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-lg p-4 w-full max-w-xl space-y-3">
+              <h3 className="text-lg font-semibold">แก้ไขรายการยืม/คืน</h3>
+              <div className="grid md:grid-cols-2 gap-3">
+                <label className="text-sm">ผู้ยืม
+                  <input className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.borrower_name ?? ''} onChange={e=>setEditBorrow(p=>({...p, borrower_name: e.target.value}))} />
+                </label>
+                <label className="text-sm">แผนกผู้ยืม
+                  <input className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.borrower_dept ?? ''} onChange={e=>setEditBorrow(p=>({...p, borrower_dept: e.target.value}))} />
+                </label>
+                <label className="text-sm">สาขาผู้ยืม
+                  <select className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.borrower_branch ?? ''} onChange={e=>setEditBorrow(p=>({...p, borrower_branch: e.target.value}))}>
+                    <option value="">-- เลือก --</option>
+                    {branchOpts.map(o => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </label>
+                <label className="text-sm">ผู้ปล่อยยืม (ผู้รับผิดชอบ)
+                  <input className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.lender_name ?? ''} onChange={e=>setEditBorrow(p=>({...p, lender_name: e.target.value}))} />
+                </label>
+                <label className="text-sm">อุปกรณ์ที่ติดไป
+                  <input className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.peripherals ?? ''} onChange={e=>setEditBorrow(p=>({...p, peripherals: e.target.value}))} placeholder="เช่น สายไฟ x1, เซ็นเซอร์ x2" />
+                </label>
+                <label className="text-sm">วันที่ยืม
+                  <input type="date" className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.start_date ?? ''} onChange={e=>setEditBorrow(p=>({...p, start_date: e.target.value}))} />
+                </label>
+                <label className="text-sm">วันที่คืน (ถ้ามี)
+                  <input type="date" className="mt-1 w-full border rounded px-2 py-1" min={editBorrow.start_date ?? ''} value={editBorrow.end_date ?? ''} onChange={e=>setEditBorrow(p=>({...p, end_date: e.target.value}))} />
+                </label>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button onClick={cancelEditBorrow} className="px-3 py-1 rounded border">ยกเลิก</button>
+                <button onClick={saveEditBorrow} className="px-3 py-1 rounded bg-emerald-600 text-white">บันทึก</button>
+              </div>
             </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button onClick={cancelEditBorrow} className="px-3 py-1 rounded border">ยกเลิก</button>
-              <button onClick={saveEditBorrow} className="px-3 py-1 rounded bg-emerald-600 text-white">บันทึก</button>
+          </div>
+        )}
+
+        {/* Edit Asset Modal */}
+        {editingAssetId && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl shadow-lg p-4 w-full max-w-2xl space-y-4">
+              <h3 className="text-lg font-semibold">แก้ไขข้อมูลเครื่อง</h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                <Text label="เลขครุภัณฑ์ (Asset ID)" value={editAsset.asset_id as any} onChange={v=>setEditAsset(p=>({...p, asset_id:v}))} />
+                <Text label="รหัสเครื่อง (ID CODE)" value={editAsset.id_code as any} onChange={v=>setEditAsset(p=>({...p, id_code:v}))} />
+                <Text label="ชื่อเครื่องมือ" value={editAsset.name as any} onChange={v=>setEditAsset(p=>({...p, name:v}))} />
+
+                <Select label="ยี่ห้อ" value={editAsset.brand as any} onChange={v=>setEditAsset(p=>({...p, brand:v}))} options={brandOpts} />
+                <Select label="รุ่น" value={editAsset.model as any} onChange={v=>setEditAsset(p=>({...p, model:v}))} options={modelOpts} />
+                <Select label="บริษัทผู้ขาย" value={editAsset.vendor as any} onChange={v=>setEditAsset(p=>({...p, vendor:v}))} options={vendorOpts} />
+
+                <Text label="S/N" value={editAsset.serial as any} onChange={v=>setEditAsset(p=>({...p, serial:v}))} />
+                <Select label="แผนก" value={editAsset.department as any} onChange={v=>setEditAsset(p=>({...p, department:v}))} options={deptOpts} />
+                <Select label="สาขา" value={editAsset.branch as any} onChange={v=>setEditAsset(p=>({...p, branch:v}))} options={branchOpts} />
+                <Select label="สถานที่/อาคาร" value={editAsset.location as any} onChange={v=>setEditAsset(p=>({...p, location:v}))} options={locOpts} />
+                <Text label="วันที่ซื้อ" type="date" value={editAsset.purchase_date as any} onChange={v=>setEditAsset(p=>({...p, purchase_date:v}))} />
+                <Text label="ราคา (บาท)" value={editAsset.price as any} onChange={v=>setEditAsset(p=>({...p, price:v}))} />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button onClick={cancelEditAsset} className="px-3 py-1.5 rounded-lg border">ยกเลิก</button>
+                <button onClick={saveEditAsset} className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white">บันทึก</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* Drill-down Modal for Department */}
+      {selectedDept && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-3">
+          <div className="bg-white rounded-2xl shadow-lg w-full max-w-3xl p-4">
+            <h2 className="text-lg font-bold mb-2">รายละเอียดแผนก: {selectedDept}</h2>
+            <div className="overflow-x-auto max-h-[60vh]">
+              <table className="min-w-full text-sm">
+                <thead className="bg-slate-100 sticky top-0">
+                  <tr>
+                    <th className="px-3 py-2 text-left">วันที่ยืม</th>
+                    <th className="px-3 py-2 text-left">ครุภัณฑ์/รหัส</th>
+                    <th className="px-3 py-2 text-left">เครื่อง</th>
+                    <th className="px-3 py-2 text-left hidden md:table-cell">ยี่ห้อ/รุ่น</th>
+                    <th className="px-3 py-2 text-left hidden md:table-cell">S/N</th>
+                    <th className="px-3 py-2 text-left">ผู้ยืม</th>
+                    <th className="px-3 py-2 text-left">คืน</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {borrows
+                    .filter((b) => (b.borrower_dept || '').trim() === selectedDept)
+                    .map((b) => {
+                      const a = assets.find(x => x.id === b.asset_id);
+                      return (
+                        <tr key={b.id} className="border-b hover:bg-slate-50">
+                          <td className="px-3 py-2">{formatDate(b.start_date)}</td>
+                          <td className="px-3 py-2">{a?.asset_id || "-"}{a?.id_code ? " / " + a.id_code : ""}</td>
+                          <td className="px-3 py-2">{a?.name || "-"}</td>
+                          <td className="px-3 py-2 hidden md:table-cell">{[a?.brand, a?.model].filter(Boolean).join(" / ")}</td>
+                          <td className="px-3 py-2 hidden md:table-cell">{a?.serial || "-"}</td>
+                          <td className="px-3 py-2">{b.borrower_name || "-"}</td>
+                          <td className="px-3 py-2">{b.returned ? "✔" : "✘"}</td>
+                        </tr>
+                      )
+                    })}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-4 text-right">
+              <button onClick={() => setSelectedDept(null)} className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">
+                ปิด
+              </button>
             </div>
           </div>
         </div>
       )}
-
-      {/* Edit Asset Modal */}
-      {editingAssetId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-lg p-4 w-full max-w-2xl space-y-4">
-            <h3 className="text-lg font-semibold">แก้ไขข้อมูลเครื่อง</h3>
-            <div className="grid md:grid-cols-2 gap-4">
-              <Text label="เลขครุภัณฑ์ (Asset ID)" value={editAsset.asset_id as any} onChange={v=>setEditAsset(p=>({...p, asset_id:v}))} />
-              <Text label="รหัสเครื่อง (ID CODE)" value={editAsset.id_code as any} onChange={v=>setEditAsset(p=>({...p, id_code:v}))} />
-              <Text label="ชื่อเครื่องมือ" value={editAsset.name as any} onChange={v=>setEditAsset(p=>({...p, name:v}))} />
-
-              <Select label="ยี่ห้อ" value={editAsset.brand as any} onChange={v=>setEditAsset(p=>({...p, brand:v}))} options={brandOpts} />
-              <Select label="รุ่น" value={editAsset.model as any} onChange={v=>setEditAsset(p=>({...p, model:v}))} options={modelOpts} />
-              <Select label="บริษัทผู้ขาย" value={editAsset.vendor as any} onChange={v=>setEditAsset(p=>({...p, vendor:v}))} options={vendorOpts} />
-
-              <Text label="S/N" value={editAsset.serial as any} onChange={v=>setEditAsset(p=>({...p, serial:v}))} />
-              <Select label="แผนก" value={editAsset.department as any} onChange={v=>setEditAsset(p=>({...p, department:v}))} options={deptOpts} />
-              <Select label="สาขา" value={editAsset.branch as any} onChange={v=>setEditAsset(p=>({...p, branch:v}))} options={branchOpts} />
-              <Select label="สถานที่/อาคาร" value={editAsset.location as any} onChange={v=>setEditAsset(p=>({...p, location:v}))} options={locOpts} />
-              <Text label="วันที่ซื้อ" type="date" value={editAsset.purchase_date as any} onChange={v=>setEditAsset(p=>({...p, purchase_date:v}))} />
-              <Text label="ราคา (บาท)" value={editAsset.price as any} onChange={v=>setEditAsset(p=>({...p, price:v}))} />
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button onClick={cancelEditAsset} className="px-3 py-1.5 rounded-lg border">ยกเลิก</button>
-              <button onClick={saveEditAsset} className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white">บันทึก</button>
-            </div>
-          </div>
-        </div>
-      )}
-</main>
     </div>
   )
 }
