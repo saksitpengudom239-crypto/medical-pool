@@ -60,6 +60,17 @@ const Select = ({ label, value, onChange, options, disabled }: {
   </label>
 )
 
+
+// Local inline Edit icon to avoid import issues
+const EditIcon = ({ className = "w-3 h-3" }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+       className={className}>
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+  </svg>
+);
+
 function SignaturePad({ value, onChange }: { value?: string; onChange: (dataUrl: string) => void }) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null)
   const drawing = React.useRef(false)
@@ -530,7 +541,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
                       <td className="px-3 py-2">
   <div className="flex items-center gap-2">
     <button onClick={() => startEditAsset(a)} className="px-2 py-1 rounded-lg bg-amber-500 text-white text-xs inline-flex items-center gap-1">
-      <Pencil className="w-3 h-3" /> แก้ไข
+      <EditIcon className="w-3 h-3" /> แก้ไข
     </button>
     <button onClick={() => delAsset(a.id)} className="px-2 py-1 rounded-lg bg-rose-600 text-white text-xs inline-flex items-center gap-1">
       <Trash2 className="w-3 h-3" /> ลบ
