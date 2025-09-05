@@ -353,7 +353,8 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
   }
 
   const addBorrow = async () => {
-  if (!borrow.asset_id) return alert('เลือกเครื่องก่อน');
+  if (!borrow.asset_id) return alert('เลือกเครื่องก่อน')
+    if (!borrow.borrower_dept || !borrow.borrower_branch) { alert('ต้องเลือกแผนก/สาขาผู้ยืม'); return; };
   if (activeBorrowAssetIds.has(borrow.asset_id as string)) { alert('ยืมซ้ำไม่ได้: เครื่องนี้ยังไม่ได้คืน'); return; }
 
     // validate date order
@@ -362,6 +363,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
     if (e && parseDate(e) < parseDate(s)) { alert('วันที่คืนต้องไม่ก่อนวันที่ยืม'); return; }
 
     if (!borrow.asset_id) return alert('เลือกเครื่องก่อน')
+    if (!borrow.borrower_dept || !borrow.borrower_branch) { alert('ต้องเลือกแผนก/สาขาผู้ยืม'); return; }
     const { error } = await supabase.from('borrows').insert([borrow])
     if (error) return alert('บันทึกไม่สำเร็จ: ' + error.message)
     alert('บันทึกยืมแล้ว')
@@ -401,6 +403,8 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
         // ผู้ยืม/แผนก
         borrower_name: b.borrower_name ?? "",
         borrower_dept: b.borrower_dept ?? "",
+        borrower_branch: (b as any).borrower_branch ?? "",
+        asset_branch: a?.branch ?? "",
 
         // ลายเซ็น / สถานะคืน
         has_signature: b.borrower_signature ? "✔" : "✘",
@@ -599,6 +603,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
               </label>
               <Text label="ผู้ยืม" value={borrow.borrower_name ?? ''} onChange={v=>setBorrow(p=>({...p, borrower_name:v}))} />
               <Select label="แผนกผู้ยืม" value={borrow.borrower_dept ?? ''} onChange={v=>setBorrow(p=>({...p, borrower_dept:v}))} options={deptOpts} />
+              <Select label="สาขาผู้ยืม" value={borrow.borrower_branch ?? ''} onChange={v=>setBorrow(p=>({...p, borrower_branch:v}))} options={branchOpts} />
               <Text label="ผู้ให้ยืม" value={borrow.lender_name ?? ''} onChange={v=>setBorrow(p=>({...p, lender_name:v}))} />
               <Text label="อุปกรณ์เสริมที่ให้ไป" value={borrow.peripherals ?? ''} onChange={v=>setBorrow(p=>({...p, peripherals:v}))} />
               <Text label="วันที่ยืม" type="date" value={borrow.start_date ?? todayStr()} onChange={v=>setBorrow(p=>({...p, start_date:v}))} />
@@ -639,33 +644,27 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
     return (
       <tr key={b.id} className="border-b hover:bg-slate-50">
         <td className="px-3 py-2">{formatDate(b.start_date)}</td>
-        <td className="px-3 py-2">{asset?.asset_id}</td>
-        <td className="px-3 py-2">{asset?.id_code}</td>
+        <td className="px-3 py-2">{asset?.asset_id ? asset.asset_id : '-'}{asset?.id_code ? ` / ${asset.id_code}` : ""}</td>
         <td className="px-3 py-2">{asset?.name}</td>
-        <td className="px-3 py-2">{asset?.brand}</td>
-        <td className="px-3 py-2">{asset?.model}</td>
-        <td className="px-3 py-2">{asset?.serial}</td>
+        <td className="px-3 py-2 hidden md:table-cell">{[asset?.brand, asset?.model].filter(Boolean).join(" / ")}</td>
+        <td className="px-3 py-2 hidden md:table-cell">{asset?.serial || "-"}</td>
         <td className="px-3 py-2">{b.borrower_name}</td>
-        <td className="px-3 py-2">{b.borrower_dept}</td>
+        <td className="px-3 py-2 hidden sm:table-cell">{b.borrower_dept}</td>
+        <td className="px-3 py-2 hidden sm:table-cell">{(b as any).borrower_branch ?? '-'}</td>
         <td className="px-3 py-2">
-          {b.borrower_signature 
-            ? <span className="text-green-600">✔</span> 
-            : <span className="text-red-600">✘</span>}
+          {b.borrower_signature ? <span className="text-green-600">✔</span> : <span className="text-red-600">✘</span>}
         </td>
         <td className="px-3 py-2">
   {b.returned ? (
     <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700 text-xs">✔ คืนแล้ว</span>
   ) : (
-    <div className="flex items-center gap-2">
-      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-100 text-rose-700 text-xs">✘ ติดยืม</span>
-      <button
-        onClick={() => markReturned(b.id)}
-        className="px-2 py-1 rounded-lg bg-emerald-600 text-white text-xs inline-flex items-center gap-1"
-      >
-        <CheckCircle2 className="w-3 h-3" /> ทำเครื่องหมายคืนแล้ว
-      </button>
-      <button onClick={() => startEditBorrow(b)} className="px-2 py-1 rounded-lg bg-slate-600 text-white text-xs">แก้ไข</button>
-    </div>
+    <details className="relative">
+      <summary className="px-2 py-1 rounded-lg border cursor-pointer select-none">⋮</summary>
+      <div className="absolute right-0 mt-1 w-44 bg-white border rounded-lg shadow z-10">
+        <button onClick={() => markReturned(b.id)} className="w-full text-left px-3 py-2 hover:bg-slate-50">ทำเครื่องหมายคืนแล้ว</button>
+        <button onClick={() => startEditBorrow(b)} className="w-full text-left px-3 py-2 hover:bg-slate-50">แก้ไข</button>
+      </div>
+    </details>
   )}
 </td>
       		</tr>
@@ -698,6 +697,8 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
     <th className="px-3 py-2 text-left hidden md:table-cell">S/N</th>
     <th className="px-3 py-2 text-left">ผู้ยืม</th>
     <th className="px-3 py-2 text-left hidden sm:table-cell">แผนก</th>
+    <th className="px-3 py-2 text-left hidden sm:table-cell">สาขา (ผู้ยืม)</th>
+    <th className="px-3 py-2 text-left hidden sm:table-cell">สาขา (เครื่อง)</th>
     <th className="px-3 py-2 text-left hidden md:table-cell">มีลายเซ็น</th>
     <th className="px-3 py-2 text-left">คืน</th>
   </tr>
@@ -713,7 +714,8 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
       <td className="px-3 py-2 hidden md:table-cell">{r.serial || "-"}</td>
       <td className="px-3 py-2">{r.borrower_name}</td>
       <td className="px-3 py-2 hidden sm:table-cell">{r.borrower_dept || "-"}</td>
-      <td className="px-3 py-2">{(r as any).borrower_branch ?? ''}</td>
+      <td className="px-3 py-2 hidden sm:table-cell">{r.borrower_branch || "-"}</td>
+      <td className="px-3 py-2 hidden sm:table-cell">{r.asset_branch || "-"}</td></td>
       <td className="px-3 py-2 hidden md:table-cell">{r.has_signature === "✔" ? "✔" : "✘"}</td>
       <td className="px-3 py-2">{r.returned ? "✔" : "✘"}</td>
     </tr>
@@ -750,6 +752,12 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
               </label>
               <label className="text-sm">แผนกผู้ยืม
                 <input className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.borrower_dept ?? ''} onChange={e=>setEditBorrow(p=>({...p, borrower_dept: e.target.value}))} />
+              </label>
+              <label className="text-sm">สาขาผู้ยืม
+                <select className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.borrower_branch ?? ''} onChange={e=>setEditBorrow(p=>({...p, borrower_branch: e.target.value}))}>
+                  <option value="">-- เลือก --</option>
+                  {branchOpts.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
               </label>
               <label className="text-sm">ผู้ปล่อยยืม (ผู้รับผิดชอบ)
                 <input className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.lender_name ?? ''} onChange={e=>setEditBorrow(p=>({...p, lender_name: e.target.value}))} />
