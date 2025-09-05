@@ -535,72 +535,49 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
     XLSX.writeFile(wb, 'report.xlsx')
   }
 
-    const [dashBranch, setDashBranch] = React.useState<string>('All')
+    // ---- Dashboard state & memos (clean) ----
+const [dashBranch, setDashBranch] = React.useState<string>('All');
+const [dashFrom, setDashFrom] = React.useState('');
+const [dashTo, setDashTo] = React.useState('');
 
-  // === Dashboard trend (clean) ===
-  const borrowTrendData = React.useMemo(() => {
-    const from = dashFrom ? parseDate(dashFrom).getTime() : -Infinity;
-    const to   = dashTo   ? parseDate(dashTo).getTime()   : Infinity;
-    const grouped: Record<string, number> = {};
-    borrows.forEach((b) => {
-      const t = parseDate(b.start_date).getTime();
-      if (t < from || t > to) return;
-      const a = assets.find(x => x.id === b.asset_id);
-      const branchOk = dashBranch === 'All' || (b as any).borrower_branch === dashBranch || (a?.branch ?? '') === dashBranch;
-      if (!branchOk) return;
-      grouped[b.start_date] = (grouped[b.start_date] || 0) + 1;
-    });
-    return Object.entries(grouped || {})
-      .sort((a,b)=>a[0].localeCompare(b[0]))
-      .map(([date, count]) => ({ date, count }));
-  }, [borrows, assets, dashBranch, dashFrom, dashTo]);
-
-    () => borrowTrendData.reduce((sum: number, d: any) => sum + (d?.count ?? 0), 0),
-    [borrowTrendData]
-  );
-  const avgDash = React.useMemo(
-  );
-
-  const [dashFrom, setDashFrom] = React.useState('')
-  const [dashTo, setDashTo] = React.useState('')
-
-    // build daily counts by start_date after filters
-    const from = dashFrom ? new Date(dashFrom + 'T00:00:00').getTime() : -Infinity;
-    const to = dashTo ? new Date(dashTo + 'T00:00:00').getTime() : Infinity;
-    const counts: Record<string, number> = {};
-    borrows.forEach(b => {
-      const t = new Date(b.start_date + 'T00:00:00').getTime();
-      if (t < from || t > to) return;
-      // branch filter: match borrower_branch or asset.branch
-      const a = assets.find(x => x.id === b.asset_id);
-      const branchOk = dashBranch === 'All' || (b as any).borrower_branch === dashBranch || (a?.branch ?? '') === dashBranch;
-      if (!branchOk) return;
-      const d = b.start_date;
-      counts[d] = (counts[d] || 0) + 1;
-    });
-    // convert to sorted array
-    return Object.keys(counts).sort().map(d => ({ date: d, count: counts[d] }));
-  }, [borrows, assets, dashBranch, dashFrom, dashTo]);
-
-
-
+// สร้างข้อมูลกราฟ (จำนวนการยืมต่อวัน) ตามตัวกรอง
 const borrowTrendData = React.useMemo(() => {
-    const from = dashFrom ? parseDate(dashFrom).getTime() : -Infinity;
-    const to   = dashTo   ? parseDate(dashTo).getTime()   : Infinity;
-    const grouped: Record<string, number> = {};
-    borrows.forEach(b => {
-      const t = parseDate(b.start_date).getTime();
-      if (t < from || t > to) return;
-      const asset = assets.find(a => a.id === b.asset_id);
-      if (dashBranch !== 'All') {
-        const branchOk = (b as any).borrower_branch === dashBranch || (asset?.branch ?? '') === dashBranch;
-        if (!branchOk) return;
-      }
-      const key = b.start_date;
-      grouped[key] = (grouped[key]||0)+1;
-    });
-    return Object.entries(grouped).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,count])=>({date,count})) || []; // fallback
-  }, [borrows, assets, dashBranch, dashFrom, dashTo]);
+  const from = dashFrom ? parseDate(dashFrom).getTime() : -Infinity;
+  const to   = dashTo   ? parseDate(dashTo).getTime()   : Infinity;
+
+  const grouped: Record<string, number> = {};
+
+  borrows.forEach((b) => {
+    const t = parseDate(b.start_date).getTime();
+    if (t < from || t > to) return;
+
+    const a = assets.find(x => x.id === b.asset_id);
+    const branchOk =
+      dashBranch === 'All' ||
+      (b as any).borrower_branch === dashBranch ||
+      (a?.branch ?? '') === dashBranch;
+    if (!branchOk) return;
+
+    grouped[b.start_date] = (grouped[b.start_date] || 0) + 1;
+  });
+
+  return Object.entries(grouped)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([date, count]) => ({ date, count }));
+}, [borrows, assets, dashBranch, dashFrom, dashTo]);
+
+// รวมทั้งหมดและค่าเฉลี่ย (ถ้าอยากโชว์บนการ์ด)
+const totalDash = React.useMemo(
+  () => borrowTrendData.reduce((sum, d) => sum + (d?.count ?? 0), 0),
+  [borrowTrendData]
+);
+
+const avgDash = React.useMemo(
+  () => (borrowTrendData.length ? Math.round(totalDash / borrowTrendData.length) : 0),
+  [borrowTrendData, totalDash]
+);
+// ---- /Dashboard state & memos ----
+
 const overdue = React.useMemo(() => {
 
   
