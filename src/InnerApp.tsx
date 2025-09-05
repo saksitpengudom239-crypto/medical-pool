@@ -494,7 +494,7 @@ const overdue = React.useMemo(() => {
     });
     return Object.entries(grouped).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,count])=>({date,count}));
   }, [borrows, assets, dashBranch, dashFrom, dashTo]);
-st now = parseDate(todayStr()).getTime()
+conconst now = parseDate(todayStr()).getTime()
     return borrows.filter(b => !b.returned && (now - parseDate(b.start_date).getTime())/(1000*60*60*24) > 14)
   }, [borrows])
 
