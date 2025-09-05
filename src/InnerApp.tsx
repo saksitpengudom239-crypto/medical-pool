@@ -626,6 +626,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
       >
         <CheckCircle2 className="w-3 h-3" /> ทำเครื่องหมายคืนแล้ว
       </button>
+      <button onClick={() => startEditBorrow(b)} className="px-2 py-1 rounded-lg bg-slate-600 text-white text-xs">แก้ไข</button>
     </div>
   )}
 </td>
