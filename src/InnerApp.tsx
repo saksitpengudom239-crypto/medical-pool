@@ -741,7 +741,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
                 <input className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.start_date ?? ''} onChange={e=>setEditBorrow(p=>({...p, start_date: e.target.value}))} />
               </label>
               <label className="text-sm">วันที่คืน (ถ้ามี)
-                <input className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.end_date ?? ''} onChange={e=>setEditBorrow(p=>({...p, end_date: e.target.value}))} />
+                <input type="date" className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.end_date ?? ''} onChange={e=>setEditBorrow(p=>({...p, end_date: e.target.value}))} />
               </label>
             </div>
             <div className="flex justify-end gap-2 pt-2">
