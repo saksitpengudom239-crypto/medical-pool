@@ -3,6 +3,22 @@ import { LayoutDashboard, Archive, Undo2, FileBarChart2, Settings as SettingsIco
 import * as XLSX from 'xlsx'
 import { supabase } from './supabaseClient'
 
+// Simple Error Boundary to avoid blank screen
+class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, err?: any}> {
+  constructor(props:any){ super(props); this.state = { hasError: false }; }
+  static getDerivedStateFromError(error:any){ return { hasError: true, err: error }; }
+  componentDidCatch(error:any, info:any){ console.error('UI ErrorBoundary:', error, info); }
+  render(){
+    if(this.state.hasError){
+      return <div className="p-4 m-4 border rounded-xl bg-rose-50 text-rose-700">
+        เกิดข้อผิดพลาดในการแสดงผล — โปรดลองรีเฟรชหน้า หรือส่งภาพหน้า Console มาให้ผู้ดูแล
+      </div>;
+    }
+    return this.props.children as any;
+  }
+}
+
+
 // Lightweight SVG line chart (no external deps)
 function BorrowLineChart({ data }: { data: { date: string; count: number }[] }) {
   const width = 800, height = 240, pad = 32;
@@ -272,6 +288,8 @@ function OptionEditor({ table, title }: { table: 'brands'|'vendors'|'departments
     </div>
   )
 }
+
+window.addEventListener("error", (e)=>{ console.error("GlobalError:", e.message, e.error); });
 
 export default function App() {
   const [tab, setTab] = React.useState<'dashboard'|'register'|'borrow'|'report'|'settings'>('dashboard')
@@ -553,13 +571,14 @@ const overdue = React.useMemo(() => {
       const key = b.start_date;
       grouped[key] = (grouped[key]||0)+1;
     });
-    return Object.entries(grouped).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,count])=>({date,count}));
+    return Object.entries(grouped).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,count])=>({date,count})) || []; // fallback
   }, [borrows, assets, dashBranch, dashFrom, dashTo]);
 const now = parseDate(todayStr()).getTime()
     return borrows.filter(b => !b.returned && (now - parseDate(b.start_date).getTime())/(1000*60*60*24) > 14)
   }, [borrows])
 
   return (
+    <ErrorBoundary>
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 text-slate-800">
       <header className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b">
   <div className="mx-auto max-w-6xl px-3 sm:px-4 py-3 flex items-center gap-3">
@@ -954,5 +973,6 @@ const now = parseDate(todayStr()).getTime()
       )}
 </main>
     </div>
+    </ErrorBoundary>
   )
 }
