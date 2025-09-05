@@ -8,4 +8,12 @@ if (!url || !anon) {
   console.warn('[supabaseClient] VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY is missing.')
 }
 
-export const supabase = createClient(url as string, anon as string)
+export const supabase = createClient(url as string, anon as string, {
+  auth: {
+    autoRefreshToken: true,       // ต่ออายุ token ระหว่างใช้งาน
+    persistSession: true,         // ให้จำ session
+    detectSessionInUrl: true,
+    storage: typeof window !== 'undefined' ? window.sessionStorage : undefined, 
+    // 👆 เก็บ session ใน sessionStorage → ปิดเบราว์เซอร์แล้วหาย
+  },
+})
