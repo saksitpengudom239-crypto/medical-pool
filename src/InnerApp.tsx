@@ -512,7 +512,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
                     <th className="px-3 py-2 text-left">S/N</th>
                     <th className="px-3 py-2 text-left">แผนก</th>
                     <th className="px-3 py-2 text-left">สถานที่</th>
-                    <th className="px-3 py-2 text-left">แก้ไข/ลบ</th>
+                    <th className="px-3 py-2 text-left">ลบ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -528,15 +528,10 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
                       <td className="px-3 py-2">{a.department}</td>
                       <td className="px-3 py-2">{a.location}</td>
                       <td className="px-3 py-2">
-  <div className="flex items-center gap-2">
-    <button onClick={() => startEditAsset(a)} className="px-2 py-1 rounded-lg bg-amber-500 text-white text-xs inline-flex items-center gap-1">
-      <Pencil className="w-3 h-3" /> แก้ไข
-    </button>
-    <button onClick={() => delAsset(a.id)} className="px-2 py-1 rounded-lg bg-rose-600 text-white text-xs inline-flex items-center gap-1">
-      <Trash2 className="w-3 h-3" /> ลบ
-    </button>
-  </div>
-</td>
+                        <button onClick={() => delAsset(a.id)} className="px-2 py-1 rounded-lg bg-rose-600 text-white text-xs inline-flex items-center gap-1">
+                          <Trash2 className="w-3 h-3" /> ลบ
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
