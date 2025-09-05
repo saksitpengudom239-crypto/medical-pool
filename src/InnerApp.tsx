@@ -376,6 +376,8 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
   }
 
   const [dateFrom, setDateFrom] = React.useState('')
+  const [reportBranch, setReportBranch] = React.useState<string>('All')
+  const [reportDept, setReportDept] = React.useState<string>('All')
   const [dateTo, setDateTo] = React.useState('')
   const reportRows = React.useMemo(() => {
   const from = dateFrom ? parseDate(dateFrom).getTime() : -Infinity;
@@ -384,7 +386,13 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
   return borrows
     .filter(b => {
       const t = parseDate(b.start_date).getTime();
-      return t >= from && t <= to;
+      const inRange = t >= from && t <= to;
+      if (!inRange) return false;
+      // เพิ่มเงื่อนไขกรอง แผนก/สาขา
+      const a = assets.find(x => x.id === b.asset_id);
+      const deptOk = reportDept === 'All' || b.borrower_dept === reportDept || (a?.department ?? '') === reportDept;
+      const branchOk = reportBranch === 'All' || (b as any).borrower_branch === reportBranch || (a?.branch ?? '') === reportBranch;
+      return deptOk && branchOk;
     })
     .map(b => {
       const a = assets.find(x => x.id === b.asset_id); // หา asset ครั้งเดียว
@@ -412,7 +420,7 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
         end_date: b.end_date ?? ""
       };
     });
-}, [borrows, assets, dateFrom, dateTo]);
+}, [borrows, assets, dateFrom, dateTo, reportDept, reportBranch]);
 
   const exportXLSX = () => {
     const exportable = reportRows.map(({ borrower_signature, ...rest }) => rest)
@@ -676,9 +684,11 @@ const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayS
         {tab==='report' && (
           <section className="bg-white border rounded-2xl p-4 shadow-soft space-y-4">
             <h2 className="text-lg font-semibold">รายงาน</h2>
-            <div className="grid md:grid-cols-4 gap-4">
+            <div className="grid md:grid-cols-6 gap-4">
               <Text label="จากวันที่" type="date" value={dateFrom} onChange={setDateFrom} />
               <Text label="ถึงวันที่" type="date" value={dateTo} onChange={setDateTo} />
+              <Select label="แผนก (กรอง)" value={reportDept} onChange={v=>setReportDept(v)} options={["All", ...deptOpts]} />
+              <Select label="สาขา (กรอง)" value={reportBranch} onChange={v=>setReportBranch(v)} options={["All", ...branchOpts]} />
               <button onClick={exportXLSX} className="px-4 py-2 rounded-xl bg-emerald-600 text-white inline-flex items-center gap-2"><Download className="w-4 h-4"/> Export Excel (.xlsx)</button>
               <button onClick={() => window.print()} className="px-4 py-2 rounded-xl bg-slate-200 inline-flex items-center gap-2"><Printer className="w-4 h-4"/> พิมพ์</button>
             </div>
