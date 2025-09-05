@@ -252,7 +252,21 @@ const activeBorrowAssetIds = React.useMemo(() => {
 
   const [form, setForm] = React.useState<Partial<Asset>>({})
   const addAsset = async () => {
-    const { error } = await supabase.from('assets').insert([form])
+    const payload: any = {
+      asset_id: form.asset_id ?? null,
+      id_code: form.id_code ?? null,
+      name: form.name ?? null,
+      brand: form.brand ?? null,
+      model: form.model ?? null,
+      vendor: form.vendor ?? null,
+      serial: form.serial ?? null,
+      department: form.department ?? null,
+      branch: form.branch ?? null,
+      location: form.location ?? null,
+      purchase_date: form.purchase_date ?? null,
+      price: form.price ?? null,
+    }
+    const { error } = await supabase.from('assets').insert([payload])
     if (error) return alert('บันทึกไม่สำเร็จ: ' + error.message)
     alert('บันทึกแล้ว')
     setForm({})
@@ -301,6 +315,7 @@ const activeBorrowAssetIds = React.useMemo(() => {
       vendor: editAsset.vendor ?? null,
       serial: editAsset.serial ?? null,
       department: editAsset.department ?? null,
+      branch: editAsset.branch ?? null,
       location: editAsset.location ?? null,
       purchase_date: editAsset.purchase_date ?? null,
       price: editAsset.price ?? null,
