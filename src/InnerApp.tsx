@@ -241,43 +241,6 @@ const activeBorrowAssetIds = React.useMemo(() => {
   }
 
   const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayStr(), borrower_signature: '' })
-
-  // === Borrow edit modal state ===
-  const [editingBorrowId, setEditingBorrowId] = React.useState<string | null>(null)
-  const [editBorrow, setEditBorrow] = React.useState<Partial<Borrow>>({})
-
-  const startEditBorrow = (b: Borrow) => {
-    setEditingBorrowId(b.id)
-    setEditBorrow({
-      borrower_name: b.borrower_name,
-      borrower_dept: b.borrower_dept,
-      lender_name: b.lender_name,
-      peripherals: b.peripherals,
-      start_date: b.start_date,
-      end_date: b.end_date ?? undefined,
-    })
-  }
-
-  const cancelEditBorrow = () => {
-    setEditingBorrowId(null)
-    setEditBorrow({})
-  }
-
-  const saveEditBorrow = async () => {
-    if (!editingBorrowId) return
-    const payload: any = {
-      borrower_name: editBorrow.borrower_name ?? null,
-      borrower_dept: editBorrow.borrower_dept ?? null,
-      lender_name: editBorrow.lender_name ?? null,
-      peripherals: editBorrow.peripherals ?? null,
-      start_date: editBorrow.start_date ?? null,
-      end_date: editBorrow.end_date ?? null,
-    }
-    await supabase.from('borrows').update(payload).eq('id', editingBorrowId)
-    await loadBorrows()
-    cancelEditBorrow()
-  }
-
   const addBorrow = async () => {
   if (!borrow.asset_id) return alert('เลือกเครื่องก่อน');
   if (activeBorrowAssetIds.has(borrow.asset_id as string)) { alert('ยืมซ้ำไม่ได้: เครื่องนี้ยังไม่ได้คืน'); return; }
@@ -407,15 +370,11 @@ const activeBorrowAssetIds = React.useMemo(() => {
                       <tr key={b.id} className="border-b hover:bg-slate-50">
                         <td className="px-3 py-2">
       {b.returned ? (
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700 text-xs">✔ คืนแล้ว</span>
-          <button onClick={() => startEditBorrow(b)} className="ml-2 px-2 py-1 rounded bg-slate-600 text-white text-xs">แก้ไข</button>
-        </div>
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700 text-xs">✔ คืนแล้ว</span>
       ) : (
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-100 text-rose-700 text-xs">✘ ยังไม่คืน</span>
           <button onClick={() => markReturned(b.id)} className="px-2 py-1 rounded-lg bg-emerald-600 text-white text-xs">ทำเครื่องหมายคืนแล้ว</button>
-          <button onClick={() => startEditBorrow(b)} className="px-2 py-1 rounded bg-slate-600 text-white text-xs">แก้ไข</button>
         </div>
       )}
     </td>
@@ -654,40 +613,7 @@ const activeBorrowAssetIds = React.useMemo(() => {
             <p className="text-xs text-slate-500">* ถ้าเมนูดรอปดาวไม่ขึ้นรายการ ให้กลับไปหน้า ลงทะเบียน แล้วกดรีเฟรชเพื่อโหลดรายการล่าสุด</p>
           </section>
         )}
-      
-      {/* Edit Borrow Modal */}
-      {editingBorrowId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-lg p-4 w-full max-w-xl space-y-3">
-            <h3 className="text-lg font-semibold">แก้ไขรายการยืม/คืน</h3>
-            <div className="grid md:grid-cols-2 gap-3">
-              <label className="text-sm">ผู้ยืม
-                <input className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.borrower_name ?? ''} onChange={e=>setEditBorrow(p=>({...p, borrower_name: e.target.value}))} />
-              </label>
-              <label className="text-sm">แผนกผู้ยืม
-                <input className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.borrower_dept ?? ''} onChange={e=>setEditBorrow(p=>({...p, borrower_dept: e.target.value}))} />
-              </label>
-              <label className="text-sm">ผู้ปล่อยยืม (ผู้รับผิดชอบ)
-                <input className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.lender_name ?? ''} onChange={e=>setEditBorrow(p=>({...p, lender_name: e.target.value}))} />
-              </label>
-              <label className="text-sm">อุปกรณ์ที่ติดไป
-                <input className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.peripherals ?? ''} onChange={e=>setEditBorrow(p=>({...p, peripherals: e.target.value}))} placeholder="เช่น สายไฟ x1, เซ็นเซอร์ x2" />
-              </label>
-              <label className="text-sm">วันที่ยืม (YYYY-MM-DD)
-                <input className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.start_date ?? ''} onChange={e=>setEditBorrow(p=>({...p, start_date: e.target.value}))} />
-              </label>
-              <label className="text-sm">วันที่คืน (ถ้ามี)
-                <input className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.end_date ?? ''} onChange={e=>setEditBorrow(p=>({...p, end_date: e.target.value}))} />
-              </label>
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button onClick={cancelEditBorrow} className="px-3 py-1 rounded border">ยกเลิก</button>
-              <button onClick={saveEditBorrow} className="px-3 py-1 rounded bg-emerald-600 text-white">บันทึก</button>
-            </div>
-          </div>
-        </div>
-      )}
-</main>
+      </main>
     </div>
   )
 }
