@@ -240,7 +240,91 @@ const activeBorrowAssetIds = React.useMemo(() => {
     loadAssets()
   }
 
-  const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayStr(), borrower_signature: '' })
+  
+  // === Asset edit modal state ===
+  const [editingAssetId, setEditingAssetId] = React.useState<string | null>(null)
+  const [editAsset, setEditAsset] = React.useState<Partial<Asset>>({})
+
+  const startEditAsset = (a: Asset) => {
+    setEditingAssetId(a.id)
+    setEditAsset({
+      asset_id: a.asset_id,
+      id_code: a.id_code,
+      name: a.name,
+      brand: a.brand,
+      model: a.model,
+      vendor: a.vendor,
+      serial: a.serial,
+      department: a.department,
+      location: a.location,
+      purchase_date: a.purchase_date,
+      price: a.price,
+    })
+  }
+
+  const cancelEditAsset = () => {
+    setEditingAssetId(null)
+    setEditAsset({})
+  }
+
+  const saveEditAsset = async () => {
+    if (!editingAssetId) return
+    const payload: any = {
+      asset_id: editAsset.asset_id ?? null,
+      id_code: editAsset.id_code ?? null,
+      name: editAsset.name ?? null,
+      brand: editAsset.brand ?? null,
+      model: editAsset.model ?? null,
+      vendor: editAsset.vendor ?? null,
+      serial: editAsset.serial ?? null,
+      department: editAsset.department ?? null,
+      location: editAsset.location ?? null,
+      purchase_date: editAsset.purchase_date ?? null,
+      price: editAsset.price ?? null,
+    }
+    const { error } = await supabase.from('assets').update(payload).eq('id', editingAssetId)
+    if (error) { alert('บันทึกไม่สำเร็จ: ' + error.message); return }
+    await loadAssets()
+    cancelEditAsset()
+  }
+const [borrow, setBorrow] = React.useState<Partial<Borrow>>({ start_date: todayStr(), borrower_signature: '' })
+
+  // === Borrow edit modal state ===
+  const [editingBorrowId, setEditingBorrowId] = React.useState<string | null>(null)
+  const [editBorrow, setEditBorrow] = React.useState<Partial<Borrow>>({})
+
+  const startEditBorrow = (b: Borrow) => {
+    setEditingBorrowId(b.id)
+    setEditBorrow({
+      borrower_name: b.borrower_name,
+      borrower_dept: b.borrower_dept,
+      lender_name: b.lender_name,
+      peripherals: b.peripherals,
+      start_date: b.start_date,
+      end_date: b.end_date ?? undefined,
+    })
+  }
+
+  const cancelEditBorrow = () => {
+    setEditingBorrowId(null)
+    setEditBorrow({})
+  }
+
+  const saveEditBorrow = async () => {
+    if (!editingBorrowId) return
+    const payload: any = {
+      borrower_name: editBorrow.borrower_name ?? null,
+      borrower_dept: editBorrow.borrower_dept ?? null,
+      lender_name: editBorrow.lender_name ?? null,
+      peripherals: editBorrow.peripherals ?? null,
+      start_date: editBorrow.start_date ?? null,
+      end_date: editBorrow.end_date ?? null,
+    }
+    await supabase.from('borrows').update(payload).eq('id', editingBorrowId)
+    await loadBorrows()
+    cancelEditBorrow()
+  }
+
   const addBorrow = async () => {
   if (!borrow.asset_id) return alert('เลือกเครื่องก่อน');
   if (activeBorrowAssetIds.has(borrow.asset_id as string)) { alert('ยืมซ้ำไม่ได้: เครื่องนี้ยังไม่ได้คืน'); return; }
@@ -370,11 +454,15 @@ const activeBorrowAssetIds = React.useMemo(() => {
                       <tr key={b.id} className="border-b hover:bg-slate-50">
                         <td className="px-3 py-2">
       {b.returned ? (
-        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700 text-xs">✔ คืนแล้ว</span>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700 text-xs">✔ คืนแล้ว</span>
+          <button onClick={() => startEditBorrow(b)} className="ml-2 px-2 py-1 rounded bg-slate-600 text-white text-xs">แก้ไข</button>
+        </div>
       ) : (
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-100 text-rose-700 text-xs">✘ ยังไม่คืน</span>
           <button onClick={() => markReturned(b.id)} className="px-2 py-1 rounded-lg bg-emerald-600 text-white text-xs">ทำเครื่องหมายคืนแล้ว</button>
+          <button onClick={() => startEditBorrow(b)} className="px-2 py-1 rounded bg-slate-600 text-white text-xs">แก้ไข</button>
         </div>
       )}
     </td>
@@ -613,7 +701,68 @@ const activeBorrowAssetIds = React.useMemo(() => {
             <p className="text-xs text-slate-500">* ถ้าเมนูดรอปดาวไม่ขึ้นรายการ ให้กลับไปหน้า ลงทะเบียน แล้วกดรีเฟรชเพื่อโหลดรายการล่าสุด</p>
           </section>
         )}
-      </main>
+      
+      {/* Edit Borrow Modal */}
+      {editingBorrowId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-lg p-4 w-full max-w-xl space-y-3">
+            <h3 className="text-lg font-semibold">แก้ไขรายการยืม/คืน</h3>
+            <div className="grid md:grid-cols-2 gap-3">
+              <label className="text-sm">ผู้ยืม
+                <input className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.borrower_name ?? ''} onChange={e=>setEditBorrow(p=>({...p, borrower_name: e.target.value}))} />
+              </label>
+              <label className="text-sm">แผนกผู้ยืม
+                <input className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.borrower_dept ?? ''} onChange={e=>setEditBorrow(p=>({...p, borrower_dept: e.target.value}))} />
+              </label>
+              <label className="text-sm">ผู้ปล่อยยืม (ผู้รับผิดชอบ)
+                <input className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.lender_name ?? ''} onChange={e=>setEditBorrow(p=>({...p, lender_name: e.target.value}))} />
+              </label>
+              <label className="text-sm">อุปกรณ์ที่ติดไป
+                <input className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.peripherals ?? ''} onChange={e=>setEditBorrow(p=>({...p, peripherals: e.target.value}))} placeholder="เช่น สายไฟ x1, เซ็นเซอร์ x2" />
+              </label>
+              <label className="text-sm">วันที่ยืม (YYYY-MM-DD)
+                <input className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.start_date ?? ''} onChange={e=>setEditBorrow(p=>({...p, start_date: e.target.value}))} />
+              </label>
+              <label className="text-sm">วันที่คืน (ถ้ามี)
+                <input className="mt-1 w-full border rounded px-2 py-1" value={editBorrow.end_date ?? ''} onChange={e=>setEditBorrow(p=>({...p, end_date: e.target.value}))} />
+              </label>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button onClick={cancelEditBorrow} className="px-3 py-1 rounded border">ยกเลิก</button>
+              <button onClick={saveEditBorrow} className="px-3 py-1 rounded bg-emerald-600 text-white">บันทึก</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Asset Modal */}
+      {editingAssetId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-lg p-4 w-full max-w-2xl space-y-4">
+            <h3 className="text-lg font-semibold">แก้ไขข้อมูลเครื่อง</h3>
+            <div className="grid md:grid-cols-2 gap-4">
+              <Text label="เลขครุภัณฑ์ (Asset ID)" value={editAsset.asset_id as any} onChange={v=>setEditAsset(p=>({...p, asset_id:v}))} />
+              <Text label="รหัสเครื่อง (ID CODE)" value={editAsset.id_code as any} onChange={v=>setEditAsset(p=>({...p, id_code:v}))} />
+              <Text label="ชื่อเครื่องมือ" value={editAsset.name as any} onChange={v=>setEditAsset(p=>({...p, name:v}))} />
+
+              <Select label="ยี่ห้อ" value={editAsset.brand as any} onChange={v=>setEditAsset(p=>({...p, brand:v}))} options={brandOpts} />
+              <Select label="รุ่น" value={editAsset.model as any} onChange={v=>setEditAsset(p=>({...p, model:v}))} options={modelOpts} />
+              <Select label="บริษัทผู้ขาย" value={editAsset.vendor as any} onChange={v=>setEditAsset(p=>({...p, vendor:v}))} options={vendorOpts} />
+
+              <Text label="S/N" value={editAsset.serial as any} onChange={v=>setEditAsset(p=>({...p, serial:v}))} />
+              <Select label="แผนก" value={editAsset.department as any} onChange={v=>setEditAsset(p=>({...p, department:v}))} options={deptOpts} />
+              <Select label="สถานที่/อาคาร" value={editAsset.location as any} onChange={v=>setEditAsset(p=>({...p, location:v}))} options={locOpts} />
+              <Text label="วันที่ซื้อ" type="date" value={editAsset.purchase_date as any} onChange={v=>setEditAsset(p=>({...p, purchase_date:v}))} />
+              <Text label="ราคา (บาท)" value={editAsset.price as any} onChange={v=>setEditAsset(p=>({...p, price:v}))} />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button onClick={cancelEditAsset} className="px-3 py-1.5 rounded-lg border">ยกเลิก</button>
+              <button onClick={saveEditAsset} className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white">บันทึก</button>
+            </div>
+          </div>
+        </div>
+      )}
+</main>
     </div>
   )
 }
