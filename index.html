@@ -2,8 +2,20 @@
 <html lang="th">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport: อันนี้ใช้ได้แล้ว จะ 1 หรือ 1.0 ก็เท่ากัน -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
     <title>Chularat - Medical Pool</title>
+
+    <!-- แก้ 404 favicon: ใช้ภาพที่มีอยู่จริง -->
+    <link rel="icon" type="image/png" href="/chg-logo.png" />
+    <!-- หรือถ้ามีไฟล์ public/favicon.ico ก็ใช้บรรทัดนี้แทน -->
+    <!-- <link rel="icon" href="/favicon.ico" /> -->
+
+    <!-- เพิ่มสีแท็บ/แถบสถานะบนมือถือ -->
+    <meta name="theme-color" content="#2563eb" />
+    <!-- (ทางเลือก) ไอคอนสำหรับ iOS -->
+    <link rel="apple-touch-icon" href="/chg-logo.png" />
   </head>
   <body class="min-h-screen">
     <div id="root"></div>
