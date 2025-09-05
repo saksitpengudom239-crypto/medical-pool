@@ -1,21 +1,8 @@
+
 import React from 'react'
 import { LayoutDashboard, Archive, Undo2, FileBarChart2, Settings as SettingsIcon, CheckCircle2, AlertTriangle, Download, Printer, Trash2, Plus } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { supabase } from './supabaseClient'
-
-// === NEW: Recharts for graphs ===
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  Legend,
-  CartesianGrid
-} from 'recharts'
 
 const todayStr = (): string => new Date().toISOString().slice(0, 10)
 const parseDate = (d: string): Date => new Date(d + "T00:00:00")
@@ -27,7 +14,6 @@ const formatDate = (d?: string) => {
   const [y, m, day] = parts;
   return `${day}/${m}/${y}`;
 }
-
 
 type Asset = {
   id: string;
@@ -84,7 +70,6 @@ const Select = ({ label, value, onChange, options, disabled }: {
     </select>
   </label>
 )
-
 
 // Local inline Edit icon to avoid import issues
 const EditIcon = ({ className = "w-3 h-3" }: { className?: string }) => (
@@ -225,10 +210,83 @@ function OptionEditor({ table, title }: { table: 'brands'|'vendors'|'departments
   )
 }
 
-// === NEW: helpers for charts ===
+/* ----------------- NO-LIB SVG CHARTS ------------------ */
 type DeptUsage = { dept: string; count: number }
 type MonthlyTrendPoint = { month: string; borrow: number; return: number }
 
+function SimpleBarChart({ data, onBarClick }: { data: DeptUsage[]; onBarClick?: (dept: string) => void }) {
+  const width = 600, height = 240, padding = 40;
+  const max = Math.max(1, ...data.map(d => d.count));
+  const barW = (width - padding * 2) / data.length * 0.7;
+  const gap = (width - padding * 2) / data.length * 0.3;
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-[260px]">
+      {/* axes */}
+      <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#CBD5E1" />
+      <line x1={padding} y1={padding} x2={padding} y2={height - padding} stroke="#CBD5E1" />
+      {/* bars */}
+      {data.map((d, i) => {
+        const x = padding + i * ((width - padding * 2) / data.length) + gap/2;
+        const h = (d.count / max) * (height - padding * 2);
+        const y = height - padding - h;
+        return (
+          <g key={i} onClick={() => onBarClick?.(d.dept)} className="cursor-pointer">
+            <rect x={x} y={y} width={barW} height={h} rx="6" fill="#3b82f6" />
+            <text x={x + barW / 2} y={height - padding + 14} textAnchor="middle" fontSize="10" fill="#334155">{d.dept}</text>
+            <text x={x + barW / 2} y={y - 6} textAnchor="middle" fontSize="10" fill="#0f172a">{d.count}</text>
+          </g>
+        );
+      })}
+    </svg>
+  )
+}
+
+function SimpleLineChart({ data }: { data: MonthlyTrendPoint[] }) {
+  const width = 600, height = 240, padding = 40;
+  const max = Math.max(1, ...data.map(d => Math.max(d.borrow, d.return)));
+  const stepX = (width - padding * 2) / Math.max(1, data.length - 1);
+
+  const yScale = (v: number) => height - padding - (v / max) * (height - padding * 2);
+
+  const makePath = (key: 'borrow'|'return') => {
+    const pts = data.map((d, i) => [padding + i * stepX, yScale(d[key])] as [number, number]);
+    return 'M ' + pts.map(p => p.join(',')).join(' L ');
+  };
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-[260px]">
+      {/* grid */}
+      {[0,0.25,0.5,0.75,1].map((t,i)=>{
+        const y = padding + t * (height - padding*2);
+        return <line key={i} x1={padding} y1={y} x2={width - padding} y2={y} stroke="#E2E8F0" />;
+      })}
+      {/* axes */}
+      <line x1={padding} y1={padding} x2={padding} y2={height - padding} stroke="#CBD5E1"/>
+      <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#CBD5E1"/>
+
+      {/* x labels */}
+      {data.map((d, i) => (
+        <text key={i} x={padding + i * stepX} y={height - padding + 14} textAnchor="middle" fontSize="10" fill="#334155">{d.month}</text>
+      ))}
+
+      {/* lines */}
+      <path d={makePath('borrow')} fill="none" stroke="#2563eb" strokeWidth="2" />
+      <path d={makePath('return')} fill="none" stroke="#60a5fa" strokeWidth="2" />
+
+      {/* legend */}
+      <g>
+        <rect x={width - padding - 120} y={padding - 28} width="110" height="22" rx="6" fill="#F1F5F9" />
+        <circle cx={width - padding - 100} cy={padding - 17} r="4" fill="#2563eb" />
+        <text x={width - padding - 90} y={padding - 13} fontSize="10" fill="#0f172a">Borrow</text>
+        <circle cx={width - padding - 40} cy={padding - 17} r="4" fill="#60a5fa" />
+        <text x={width - padding - 30} y={padding - 13} fontSize="10" fill="#0f172a">Return</text>
+      </g>
+    </svg>
+  )
+}
+
+/* ----------------- Helpers for charts data ------------------ */
 const monthLabel = (iso?: string | null) => {
   if (!iso) return "";
   const d = new Date(iso + "T00:00:00");
@@ -325,7 +383,6 @@ export default function App() {
     loadAssets()
   }
 
-  
   // === Asset edit modal state ===
   const [editingAssetId, setEditingAssetId] = React.useState<string | null>(null)
   const [editAsset, setEditAsset] = React.useState<Partial<Asset>>({})
@@ -461,21 +518,18 @@ export default function App() {
           id: b.id,
           start_date: b.start_date,
 
-          // ✅ คอลัมน์เพิ่มสำหรับรายงาน
-          asset_id: a?.asset_id ?? "",   // เลขครุภัณฑ์
-          id_code:  a?.id_code  ?? "",   // รหัสเครื่อง
-          asset_name: a?.name   ?? "",   // เครื่อง (ชื่อเครื่อง)
+          asset_id: a?.asset_id ?? "",
+          id_code:  a?.id_code  ?? "",
+          asset_name: a?.name   ?? "",
           brand:    a?.brand    ?? "",
           model:    a?.model    ?? "",
-          serial:   a?.serial   ?? "",   // S/N
+          serial:   a?.serial   ?? "",
 
-          // ผู้ยืม/แผนก
           borrower_name: b.borrower_name ?? "",
           borrower_dept: b.borrower_dept ?? "",
           borrower_branch: (b as any).borrower_branch ?? "",
           asset_branch: a?.branch ?? "",
 
-          // ลายเซ็น / สถานะคืน
           has_signature: b.borrower_signature ? "✔" : "✘",
           returned: !!b.returned,
           end_date: b.end_date ?? ""
@@ -496,7 +550,7 @@ export default function App() {
     return borrows.filter(b => !b.returned && (now - parseDate(b.start_date).getTime())/(1000*60*60*24) > 14)
   }, [borrows])
 
-  // === NEW: derived data for charts ===
+  // Derived data for charts
   const totalAssets = assets.length;
   const inUseCount = borrows.filter(b=>!b.returned).length;
   const utilization = totalAssets ? Math.round((inUseCount / totalAssets) * 100) : 0;
@@ -547,7 +601,7 @@ export default function App() {
               <div className="text-2xl font-semibold text-red-600">{overdue.length}</div>
             </div>
 
-            {/* === NEW: Utilization % Card === */}
+            {/* Utilization % */}
             <div className="md:col-span-3 bg-white border rounded-2xl p-4 shadow-soft">
               <div className="flex items-center justify-between gap-6">
                 <div>
@@ -557,46 +611,25 @@ export default function App() {
                     <span className="text-sm text-slate-500">กำลังยืม / จำนวนเครื่อง</span>
                   </div>
                 </div>
-                {/* simple bar as progress */}
                 <div className="w-56 h-3 rounded-full bg-slate-200 overflow-hidden">
                   <div className="h-full bg-blue-600" style={{ width: `${utilization}%` }} />
                 </div>
               </div>
             </div>
 
-            {/* === NEW: Charts Row === */}
+            {/* Charts Row */}
             <div className="bg-white border rounded-2xl p-4 shadow-soft">
               <h3 className="font-semibold mb-3 flex items-center gap-2"><AlertTriangle className="text-blue-600" />Top 5 แผนกที่ยืมบ่อย</h3>
-              <div style={{ width: '100%', height: 260 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={topDepartments.length ? topDepartments : [{dept:'-', count:0}]}>
-                    <XAxis dataKey="dept" />
-                    <YAxis allowDecimals={false} />
-                    <Tooltip />
-                    <Bar dataKey="count" onClick={(d:any)=> setSelectedDept(d.dept)} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <SimpleBarChart data={topDepartments.length ? topDepartments : [{dept:'-', count:0}]}
+                onBarClick={(dept)=> setSelectedDept(dept)} />
             </div>
 
             <div className="bg-white border rounded-2xl p-4 shadow-soft">
               <h3 className="font-semibold mb-3">Trend รายเดือน (Borrow / Return)</h3>
-              <div style={{ width: '100%', height: 260 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={monthlyTrend}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis allowDecimals={false} />
-                    <Tooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="borrow" name="Borrow" />
-                    <Line type="monotone" dataKey="return" name="Return" />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+              <SimpleLineChart data={monthlyTrend} />
             </div>
 
-            {/* Existing overdue table */}
+            {/* Overdue Table */}
             <div className="md:col-span-3 bg-white border rounded-2xl p-4">
               <h3 className="font-semibold mb-3 flex items-center gap-2"><AlertTriangle className="text-red-600" /> รายการเกิน 14 วัน</h3>
               <div className="overflow-x-auto">
@@ -858,7 +891,7 @@ export default function App() {
                       <td className="px-3 py-2 hidden sm:table-cell">{r.borrower_dept || "-"}</td>
                       <td className="px-3 py-2 hidden sm:table-cell">{r.borrower_branch || "-"}</td>
                       <td className="px-3 py-2 hidden sm:table-cell">{r.asset_branch || "-"}</td>
-                      <td className="px-3 py-2 hidden md:table-cell">{/* has_signature shown as ✔/✘ in export only */}</td>
+                      <td className="px-3 py-2 hidden md:table-cell">{/* has_signature indicator not shown */}</td>
                       <td className="px-3 py-2">{r.returned ? "✔" : "✘"}</td>
                     </tr>
                   ))}
